@@ -110,6 +110,7 @@ main {
   border-radius: var(--radius);
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
+  overflow-x: auto;
 }
 .card-header {
   display: flex;

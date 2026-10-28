@@ -40,15 +40,15 @@ pnpm start                   # same URL, no file watching
 
 Everything lives in [`sentinel.config.ts`](./sentinel.config.ts):
 
-| Key           | What it does                                                                                            |
-| ------------- | ------------------------------------------------------------------------------------------------------- |
-| `site`        | Name and base URL of the monitored site.                                                                |
-| `pages`       | Pages to check (`id`, `label`, `path`). Optional `thresholds` override the global ones for that page.   |
-| `strategies`  | `['mobile', 'desktop']` — remove one to halve the number of PSI requests.                              |
-| `psi`         | `samples` (median is stored), `delayMs` between requests, Lighthouse `categories`.                      |
-| `thresholds`  | Absolute limits: minimum scores (0–100) and maximum LCP/CLS/TBT/FCP. Breaches raise *threshold* alerts. |
-| `regression`  | Relative limits vs. the baseline (median of the previous `baselineRuns` completed runs).                 |
-| `schedule`    | Cron expression for automatic runs (server local time), or `null` to disable.                           |
+| Key          | What it does                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| `site`       | Name and base URL of the monitored site.                                                                |
+| `pages`      | Pages to check (`id`, `label`, `path`). Optional `thresholds` override the global ones for that page.   |
+| `strategies` | `['mobile', 'desktop']` — remove one to halve the number of PSI requests.                               |
+| `psi`        | `samples` (median is stored), `delayMs` between requests, Lighthouse `categories`.                      |
+| `thresholds` | Absolute limits: minimum scores (0–100) and maximum LCP/CLS/TBT/FCP. Breaches raise _threshold_ alerts. |
+| `regression` | Relative limits vs. the baseline (median of the previous `baselineRuns` completed runs).                |
+| `schedule`   | Cron expression for automatic runs (server local time), or `null` to disable.                           |
 
 Restart the dev server after editing the file. Environment variables (`.env`):
 
@@ -68,7 +68,7 @@ Restart the dev server after editing the file. Environment variables (`.env`):
    `regression.baselineRuns` completed runs (at least 2 runs are required, so the first two runs
    never produce regression alerts).
 4. **Regression** – a score lower than the baseline by `scoreDrop` points, or a timing higher by
-   `timingIncreasePct` *and* by more than the per-metric noise floor `minDelta`.
+   `timingIncreasePct` _and_ by more than the per-metric noise floor `minDelta`.
 
 ## Triggering a run from a release pipeline
 
@@ -86,16 +86,16 @@ run list and on the trend charts, which makes release-to-release comparison easy
 
 ## API
 
-| Method   | Path                      | Description                                        |
-| -------- | ------------------------- | -------------------------------------------------- |
-| `GET`    | `/api/config`             | Effective configuration (+ whether an API key is set) |
-| `GET`    | `/api/runs?limit=`        | Run list with alert counts                         |
-| `POST`   | `/api/runs`               | Start a run                                        |
-| `GET`    | `/api/runs/:id`           | Run with page results (incl. samples) and alerts   |
-| `DELETE` | `/api/runs/:id`           | Delete a run and its data                          |
-| `GET`    | `/api/trends?strategy=`   | Metric history per page for the trend charts       |
-| `GET`    | `/api/compare?from=&to=`  | Results of two runs side by side                   |
-| `GET`    | `/api/alerts?limit=`      | Latest alerts                                      |
+| Method   | Path                     | Description                                           |
+| -------- | ------------------------ | ----------------------------------------------------- |
+| `GET`    | `/api/config`            | Effective configuration (+ whether an API key is set) |
+| `GET`    | `/api/runs?limit=`       | Run list with alert counts                            |
+| `POST`   | `/api/runs`              | Start a run                                           |
+| `GET`    | `/api/runs/:id`          | Run with page results (incl. samples) and alerts      |
+| `DELETE` | `/api/runs/:id`          | Delete a run and its data                             |
+| `GET`    | `/api/trends?strategy=`  | Metric history per page for the trend charts          |
+| `GET`    | `/api/compare?from=&to=` | Results of two runs side by side                      |
+| `GET`    | `/api/alerts?limit=`     | Latest alerts                                         |
 
 ## Development without burning quota
 
