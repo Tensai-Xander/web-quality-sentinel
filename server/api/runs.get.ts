@@ -7,9 +7,9 @@ export default defineEventHandler((event) => {
   const rows = db
     .select({
       run: schema.runs,
-      alertCount: sql<number>`(select count(*) from alerts a where a.run_id = ${schema.runs.id})`,
-      failCount: sql<number>`(select count(*) from alerts a where a.run_id = ${schema.runs.id} and a.severity = 'fail')`,
-      errorCount: sql<number>`(select count(*) from page_results r where r.run_id = ${schema.runs.id} and r.status = 'error')`,
+      alertCount: sql<number>`(select count(*) from alerts a where a.run_id = runs.id)`,
+      failCount: sql<number>`(select count(*) from alerts a where a.run_id = runs.id and a.severity = 'fail')`,
+      errorCount: sql<number>`(select count(*) from page_results r where r.run_id = runs.id and r.status = 'error')`,
     })
     .from(schema.runs)
     .orderBy(desc(schema.runs.id))
