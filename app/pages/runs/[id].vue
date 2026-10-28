@@ -34,10 +34,13 @@ function issuesFor(a: Alert): AlertIssue[] {
   const ops = result?.details?.opportunities ?? []
   const metric = a.metric as keyof Opportunity['metricSavings']
   if (a.metric === 'performance') {
-    return ops.slice(0, 5).map((o) => ({ id: o.id, title: o.title, savings: o.savingsMs }))
+    return ops
+      .filter((o) => o.savingsMs || Object.values(o.metricSavings ?? {}).some((v) => v > 0))
+      .slice(0, 5)
+      .map((o) => ({ id: o.id, title: o.title, savings: o.savingsMs }))
   }
   return ops
-    .filter((o) => o.metricSavings && metric in o.metricSavings)
+    .filter((o) => (o.metricSavings?.[metric] ?? 0) > 0)
     .map((o) => ({ id: o.id, title: o.title, savings: o.metricSavings[metric] ?? null }))
     .sort((x, y) => (y.savings ?? 0) - (x.savings ?? 0))
     .slice(0, 5)
