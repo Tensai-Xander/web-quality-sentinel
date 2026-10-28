@@ -1,8 +1,21 @@
 import type { Strategy } from '~~/shared/types/sentinel'
 
+export type MetricSavings = Partial<Record<'lcp' | 'cls' | 'tbt' | 'fcp' | 'si' | 'inp', number>>
+
+export interface Opportunity {
+  id: string
+  title: string
+  savingsMs: number | null
+  displayValue: string | null
+  /** Estimated impact per metric (Lighthouse `metricSavings`), ms except cls. */
+  metricSavings: MetricSavings
+}
+
 export interface PsiSample {
   fetchTime: string
   lighthouseVersion: string
+  /** True when the page is not indexable (Lighthouse `is-crawlable` audit fails), e.g. noindex. */
+  noindex: boolean
   performance: number | null
   accessibility: number | null
   bestPractices: number | null
@@ -17,18 +30,14 @@ export interface PsiSample {
   fieldLcp: number | null
   fieldCls: number | null
   /** Failed performance audits with potential savings, biggest first. */
-  opportunities: {
-    id: string
-    title: string
-    savingsMs: number | null
-    displayValue: string | null
-  }[]
+  opportunities: Opportunity[]
 }
 
 export interface PsiAggregate {
   samples: PsiSample[]
-  median: Omit<PsiSample, 'fetchTime' | 'lighthouseVersion' | 'opportunities'>
+  median: Omit<PsiSample, 'fetchTime' | 'lighthouseVersion' | 'opportunities' | 'noindex'>
   lighthouseVersion: string
+  noindex: boolean
 }
 
 export class PsiError extends Error {
@@ -58,6 +67,24 @@ function field(exp: Json, metric: string): number | null {
   return typeof v === 'number' ? v : null
 }
 
+const SAVINGS_KEYS: Record<string, keyof MetricSavings> = {
+  LCP: 'lcp',
+  CLS: 'cls',
+  TBT: 'tbt',
+  FCP: 'fcp',
+  SI: 'si',
+  INP: 'inp',
+}
+
+function metricSavings(audit: Json): MetricSavings {
+  const out: MetricSavings = {}
+  for (const [k, v] of Object.entries(audit?.metricSavings ?? {})) {
+    const key = SAVINGS_KEYS[k]
+    if (key && typeof v === 'number') out[key] = v
+  }
+  return out
+}
+
 export function parsePsiResponse(data: Json): PsiSample {
   const lhr = data.lighthouseResult ?? {}
   const exp = data.loadingExperience ?? {}
@@ -78,13 +105,15 @@ export function parsePsiResponse(data: Json): PsiSample {
       savingsMs:
         typeof a.details?.overallSavingsMs === 'number' ? a.details.overallSavingsMs : null,
       displayValue: (a.displayValue as string) ?? null,
+      metricSavings: metricSavings(a),
     }))
     .sort((a: Json, b: Json) => (b.savingsMs ?? 0) - (a.savingsMs ?? 0))
-    .slice(0, 8)
+    .slice(0, 12)
 
   return {
     fetchTime: lhr.fetchTime ?? new Date().toISOString(),
     lighthouseVersion: lhr.lighthouseVersion ?? 'unknown',
+    noindex: lhr?.audits?.['is-crawlable']?.score === 0,
     performance: score(lhr, 'performance'),
     accessibility: score(lhr, 'accessibility'),
     bestPractices: score(lhr, 'best-practices'),
@@ -114,6 +143,7 @@ export function aggregateSamples(samples: PsiSample[]): PsiAggregate {
   return {
     samples,
     lighthouseVersion: samples[0]?.lighthouseVersion ?? 'unknown',
+    noindex: samples.some((s) => s.noindex),
     median: {
       performance: pick('performance'),
       accessibility: pick('accessibility'),

@@ -42,6 +42,8 @@ export const pageResults = sqliteTable(
     fieldCls: real('field_cls'),
     samples: integer('samples').notNull().default(0),
     lighthouseVersion: text('lighthouse_version'),
+    // Page is not indexable (noindex / robots): SEO score is informational only
+    noindex: integer('noindex', { mode: 'boolean' }).notNull().default(false),
     // JSON: per-sample scores/timings + top opportunities, for drill-down
     details: text('details'),
     createdAt: text('created_at').notNull(),

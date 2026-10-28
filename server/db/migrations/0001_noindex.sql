@@ -1,0 +1,1 @@
+ALTER TABLE `page_results` ADD `noindex` integer DEFAULT false NOT NULL;

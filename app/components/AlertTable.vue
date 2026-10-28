@@ -3,7 +3,18 @@ import type { Alert } from '~~/server/db/schema'
 import { formatMetric, formatDate } from '~~/shared/utils/format'
 import { METRIC_LABELS } from '~~/shared/types/sentinel'
 
-defineProps<{ alerts: Alert[]; showRun?: boolean }>()
+export interface AlertIssue {
+  id: string
+  title: string
+  savings: number | null
+}
+
+defineProps<{
+  alerts: Alert[]
+  showRun?: boolean
+  /** Optional: Lighthouse issues that affect the alert's metric, shown under the message. */
+  issuesFor?: (alert: Alert) => AlertIssue[]
+}>()
 const { pageLabel } = useSentinel()
 </script>
 
@@ -40,7 +51,21 @@ const { pageLabel } = useSentinel()
         <td class="num">
           {{ formatMetric(a.metric, a.kind === 'threshold' ? a.limit : a.baseline) }}
         </td>
-        <td style="white-space: normal">{{ a.message }}</td>
+        <td style="white-space: normal">
+          {{ a.message }}
+          <ul
+            v-if="issuesFor && issuesFor(a).length"
+            class="small muted"
+            style="margin: 0.3rem 0 0; padding-left: 1.1rem"
+          >
+            <li v-for="i in issuesFor(a)" :key="i.id">
+              {{ i.title
+              }}<template v-if="i.savings">
+                — ~{{ a.metric === 'cls' ? i.savings.toFixed(3) : Math.round(i.savings) + ' ms' }}
+              </template>
+            </li>
+          </ul>
+        </td>
         <td v-if="showRun" class="muted small">{{ formatDate(a.createdAt) }}</td>
       </tr>
     </tbody>

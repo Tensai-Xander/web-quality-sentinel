@@ -40,15 +40,15 @@ pnpm start                   # same URL, no file watching
 
 Everything lives in [`sentinel.config.ts`](./sentinel.config.ts):
 
-| Key          | What it does                                                                                            |
-| ------------ | ------------------------------------------------------------------------------------------------------- |
-| `site`       | Name and base URL of the monitored site.                                                                |
-| `pages`      | Pages to check (`id`, `label`, `path`). Optional `thresholds` override the global ones for that page.   |
-| `strategies` | `['mobile', 'desktop']` — remove one to halve the number of PSI requests.                               |
-| `psi`        | `samples` (median is stored), `delayMs` between requests, Lighthouse `categories`.                      |
-| `thresholds` | Absolute limits: minimum scores (0–100) and maximum LCP/CLS/TBT/FCP. Breaches raise _threshold_ alerts. |
-| `regression` | Relative limits vs. the baseline (median of the previous `baselineRuns` completed runs).                |
-| `schedule`   | Cron expression for automatic runs (server local time), or `null` to disable.                           |
+| Key          | What it does                                                                                                                                                                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `site`       | Name and base URL of the monitored site.                                                                                                                                                                                                                                        |
+| `pages`      | Pages to check (`id`, `label`, `path`). Optional `thresholds` override the global ones for that page.                                                                                                                                                                           |
+| `strategies` | `['mobile', 'desktop']` — remove one to halve the number of PSI requests.                                                                                                                                                                                                       |
+| `psi`        | `samples` (median is stored), `delayMs` between requests, Lighthouse `categories`.                                                                                                                                                                                              |
+| `thresholds` | Absolute limits: minimum scores (0–100) and maximum LCP/CLS/TBT/FCP. Defaults are Lighthouse's red ("poor") boundaries. Breaches raise _threshold_ alerts. Pages that are not indexable (`noindex`, detected via the Lighthouse `is-crawlable` audit) are never alerted on SEO. |
+| `regression` | Relative limits vs. the baseline (median of the previous `baselineRuns` completed runs).                                                                                                                                                                                        |
+| `schedule`   | Cron expression for automatic runs (server local time), or `null` to disable.                                                                                                                                                                                                   |
 
 Restart the dev server after editing the file. Environment variables (`.env`):
 

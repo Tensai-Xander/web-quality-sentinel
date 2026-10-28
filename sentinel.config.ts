@@ -32,22 +32,23 @@ const config: SentinelConfig = {
   },
 
   // Absolute limits. A page breaching one of them raises a "threshold" alert.
+  // Performance values are Lighthouse's "poor" (red) boundaries.
   thresholds: {
-    performance: 70,
+    performance: 50,
     accessibility: 90,
     bestPractices: 80,
     seo: 90,
-    lcp: 2500,
-    cls: 0.1,
-    tbt: 300,
-    fcp: 1800,
+    lcp: 4000,
+    cls: 0.25,
+    tbt: 600,
+    fcp: 3000,
   },
 
   // Relative limits versus the baseline (median of the previous N runs).
   regression: {
     baselineRuns: 5,
     scoreDrop: 10,
-    timingIncreasePct: 20,
+    timingIncreasePct: 50,
     minDelta: { lcp: 300, fcp: 300, tbt: 100, si: 500, ttfb: 200, cls: 0.03 },
   },
 

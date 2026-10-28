@@ -143,6 +143,7 @@ function storeResult(
       ...(agg?.median ?? {}),
       samples: samples.length,
       lighthouseVersion: agg?.lighthouseVersion ?? null,
+      noindex: agg?.noindex ?? false,
       details: agg
         ? JSON.stringify({
             samples: samples.map(({ opportunities: _o, ...s }) => s),
@@ -191,6 +192,8 @@ function evaluate(
     .where(eq(schema.pageResults.id, resultId))
     .get()!
   const values = toValues(current)
+  // Non-indexable pages are penalised by Lighthouse SEO on purpose; do not alert on it.
+  if (current.noindex) delete values.seo
 
   const previousRunIds = db
     .select({ id: schema.runs.id })

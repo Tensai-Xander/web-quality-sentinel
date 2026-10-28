@@ -1,16 +1,13 @@
 <script setup lang="ts">
 import type { Run, PageResult, Alert } from '~~/server/db/schema'
+import type { Opportunity } from '~~/server/utils/psi'
 import { SCORE_METRICS, TIMING_METRICS, METRIC_LABELS, type Metric } from '~~/shared/types/sentinel'
 import { formatDate, formatDuration, formatMetric } from '~~/shared/utils/format'
+import type { AlertIssue } from '~/components/AlertTable.vue'
 
 interface Details {
   samples: Record<string, number | null | string>[]
-  opportunities: {
-    id: string
-    title: string
-    savingsMs: number | null
-    displayValue: string | null
-  }[]
+  opportunities: Opportunity[]
 }
 interface RunDetail {
   run: Run
@@ -30,6 +27,21 @@ const sorted = computed(() =>
   )
 )
 const metrics: Metric[] = [...SCORE_METRICS, ...TIMING_METRICS]
+
+/** Lighthouse issues whose metricSavings touch the alert's metric, biggest impact first. */
+function issuesFor(a: Alert): AlertIssue[] {
+  const result = data.value?.results.find((r) => r.id === a.pageResultId)
+  const ops = result?.details?.opportunities ?? []
+  const metric = a.metric as keyof Opportunity['metricSavings']
+  if (a.metric === 'performance') {
+    return ops.slice(0, 5).map((o) => ({ id: o.id, title: o.title, savings: o.savingsMs }))
+  }
+  return ops
+    .filter((o) => o.metricSavings && metric in o.metricSavings)
+    .map((o) => ({ id: o.id, title: o.title, savings: o.metricSavings[metric] ?? null }))
+    .sort((x, y) => (y.savings ?? 0) - (x.savings ?? 0))
+    .slice(0, 5)
+}
 
 async function remove() {
   if (!confirm(`Delete run #${id} and its results?`)) return
@@ -87,6 +99,12 @@ onUnmounted(() => clearInterval(timer))
               <tr class="clickable" @click="expanded = expanded === r.id ? null : r.id">
                 <td>
                   <strong>{{ pageLabel(r.pageId) }}</strong>
+                  <span
+                    v-if="r.noindex"
+                    class="pill"
+                    title="Page is not indexable (noindex); SEO score is informational and not alerted"
+                    >noindex</span
+                  >
                   <div class="muted small">
                     <a :href="r.url" target="_blank" rel="noopener" @click.stop>{{ r.url }}</a>
                   </div>
@@ -165,7 +183,7 @@ onUnmounted(() => clearInterval(timer))
 
       <section class="card">
         <h2>Alerts ({{ data.alerts.length }})</h2>
-        <AlertTable :alerts="data.alerts" />
+        <AlertTable :alerts="data.alerts" :issues-for="issuesFor" />
         <p class="muted small" style="margin-top: 0.5rem">
           Thresholds and regression rules are defined in <code>sentinel.config.ts</code>.
           Regressions compare with the median of the previous
