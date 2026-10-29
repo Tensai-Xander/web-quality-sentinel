@@ -58,6 +58,16 @@ Restart the dev server after editing the file. Environment variables (`.env`):
 | `NUXT_DB_PATH`      | SQLite file location (default `.data/sentinel.db`).                  |
 | `NUXT_PSI_ENDPOINT` | Override the PSI URL — used to point at the mock during development. |
 
+### Bootstrapping the page list from a sitemap
+
+For a new site, let the sitemap propose the list instead of writing it by hand:
+
+```bash
+pnpm sentinel:init https://www.example.com
+```
+
+It reads `robots.txt` (`Sitemap:` lines, falling back to `/sitemap.xml`), follows sitemap indexes and keeps one representative URL per page _template_: `/blog/post-a`, `/blog/post-b`, … become a single `/blog/*` entry (numeric/UUID segments, and segments with more than 3 distinct values under the same parent, are treated as parameters; top-level sections are always kept). It writes `site` and `pages` into `sentinel.config.ts` when the page list is empty (`--force` to overwrite), otherwise it prints the snippet. Review the result: delete pages behind a login or of no interest, and rename ids/labels as you like.
+
 ## How regressions are detected
 
 1. **Noise reduction** – each page × device is measured `psi.samples` times (default 3) and the
