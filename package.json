@@ -12,7 +12,8 @@
     "lint": "eslint . && prettier --check .",
     "lintfix": "eslint . --fix && prettier --write .",
     "typecheck": "nuxt typecheck",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "sentinel:init": "node scripts/init-config.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
