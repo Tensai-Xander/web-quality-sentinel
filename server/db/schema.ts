@@ -2,7 +2,7 @@ import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core
 
 export const runs = sqliteTable('runs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  trigger: text('trigger').notNull(), // scheduled | manual | release
+  trigger: text('trigger').notNull(), // manual | release
   releaseTag: text('release_tag'),
   status: text('status').notNull(), // running | completed | failed
   startedAt: text('started_at').notNull(),

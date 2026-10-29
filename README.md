@@ -48,7 +48,6 @@ Everything lives in [`sentinel.config.ts`](./sentinel.config.ts):
 | `psi`        | `samples` (median is stored), `delayMs` between requests, Lighthouse `categories`.                                                                                                                                                                                              |
 | `thresholds` | Absolute limits: minimum scores (0–100) and maximum LCP/CLS/TBT/FCP. Defaults are Lighthouse's red ("poor") boundaries. Breaches raise _threshold_ alerts. Pages that are not indexable (`noindex`, detected via the Lighthouse `is-crawlable` audit) are never alerted on SEO. |
 | `regression` | Relative limits vs. the baseline (median of the previous `baselineRuns` completed runs).                                                                                                                                                                                        |
-| `schedule`   | Cron expression for automatic runs (server local time), or `null` to disable.                                                                                                                                                                                                   |
 
 Restart the dev server after editing the file. Environment variables (`.env`):
 
@@ -124,14 +123,13 @@ Other useful commands: `pnpm lint`, `pnpm lintfix`, `pnpm typecheck`, `pnpm db:s
 ## Project layout
 
 ```
-sentinel.config.ts      pages, thresholds, schedule
+sentinel.config.ts      pages, thresholds, regression rules
 shared/                 types and formatting helpers shared by server and UI
 server/db/              Drizzle schema + SQL migrations (applied automatically at startup)
 server/utils/psi.ts     PageSpeed Insights client and median aggregation
 server/utils/regression.ts  threshold and baseline/regression rules
 server/utils/runner.ts  run orchestration (one run at a time, progress, error handling)
 server/api/             JSON API used by the dashboard and by CI
-server/tasks/           Nitro scheduled task (cron)
 app/                    Nuxt dashboard: overview, run detail, trends, compare, alerts, settings
 scripts/mock-psi.mjs    fake PSI endpoint for development
 ```

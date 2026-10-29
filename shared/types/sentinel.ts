@@ -72,11 +72,9 @@ export interface SentinelConfig {
   }
   thresholds: Thresholds
   regression: RegressionRules
-  /** Cron expression (server local time). Set to null to disable scheduled runs. */
-  schedule: string | null
 }
 
-export type RunTrigger = 'scheduled' | 'manual' | 'release'
+export type RunTrigger = 'manual' | 'release'
 export type RunStatus = 'running' | 'completed' | 'failed'
 export type AlertKind = 'threshold' | 'regression'
 export type AlertSeverity = 'warn' | 'fail'

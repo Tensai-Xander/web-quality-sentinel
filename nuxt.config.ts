@@ -1,5 +1,3 @@
-import sentinelConfig from './sentinel.config'
-
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: false },
@@ -10,10 +8,6 @@ export default defineNuxtConfig({
     // Override to point at a mock (see scripts/mock-psi.mjs) during development.
     psiEndpoint: 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed',
     dbPath: '.data/sentinel.db',
-  },
-  nitro: {
-    experimental: { tasks: true },
-    scheduledTasks: sentinelConfig.schedule ? { [sentinelConfig.schedule]: ['sentinel:run'] } : {},
   },
   vite: {
     optimizeDeps: { include: ['chart.js', 'vue-chartjs'] },

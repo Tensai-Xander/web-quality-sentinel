@@ -26,12 +26,6 @@ const timingThresholds = ['lcp', 'cls', 'tbt', 'fcp'] as const
             </td>
           </tr>
           <tr>
-            <th>Schedule</th>
-            <td>
-              <code>{{ config.schedule ?? 'disabled' }}</code> (cron, server local time)
-            </td>
-          </tr>
-          <tr>
             <th>Devices</th>
             <td>{{ config.strategies.join(', ') }}</td>
           </tr>

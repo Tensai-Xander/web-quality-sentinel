@@ -51,9 +51,6 @@ const config: SentinelConfig = {
     timingIncreasePct: 50,
     minDelta: { lcp: 300, fcp: 300, tbt: 100, si: 500, ttfb: 200, cls: 0.03 },
   },
-
-  // Every day at 06:00 (server local time). null disables scheduled runs.
-  schedule: '0 6 * * *',
 }
 
 export default config
