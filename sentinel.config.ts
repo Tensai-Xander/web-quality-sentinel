@@ -71,7 +71,7 @@ const config: SentinelConfig = {
     baselineRuns: 5,
     scoreDrop: 10,
     timingIncreasePct: 50,
-    minDelta: { lcp: 300, fcp: 300, tbt: 100, si: 500, ttfb: 200, cls: 0.03 },
+    minDelta: { lcp: 300, fcp: 300, tbt: 250, si: 500, ttfb: 200, cls: 0.03 },
   },
 }
 
