@@ -10,24 +10,56 @@ run-to-run comparison and alerts.
 Everything runs locally in a single Node process — no Docker, no external database, only free
 tools.
 
-## Requirements
+## Set up for your site
 
-- Node.js 20 or newer
-- [pnpm](https://pnpm.io/installation) (`corepack enable` is enough on recent Node versions)
-- A free Google API key with the **PageSpeed Insights API** enabled. The API also works without a
-  key, but the anonymous quota is tiny and shared, so requests are often rejected with `429`.
+The whole procedure for a new team or a new website takes about 10 minutes.
 
-## Quick start
+### 1. Prerequisites
+
+- Node.js LTS (22.21+, 24 or 26) and pnpm: `npm install -g pnpm`. Behind a corporate proxy that
+  re-signs HTTPS, `npm`/`corepack` may fail with `SELF_SIGNED_CERT_IN_CHAIN`; run
+  `npm config set strict-ssl false` once (or point `NODE_EXTRA_CA_CERTS` to the proxy root
+  certificate) and retry.
+- A free Google API key with the **PageSpeed Insights API** enabled: in the
+  [Google Cloud console](https://console.cloud.google.com/), create a project, open
+  _APIs & Services → Library_ and enable "PageSpeed Insights API", then _Credentials → Create
+  credentials → API key_ (optionally restrict the key to that API). Each team should use its own
+  key: the quota is 25 000 requests per day per project. Without a key the anonymous quota is
+  tiny and shared, so requests are often rejected with `429`.
+
+### 2. Install
 
 ```bash
+git clone https://github.com/Tensai-Xander/web-quality-sentinel.git
+cd web-quality-sentinel
 pnpm install
-cp .env.example .env         # then put your key in NUXT_PSI_API_KEY
+cp .env.example .env         # then put your key in NUXT_PSI_API_KEY=
+```
+
+### 3. Choose the pages to monitor
+
+The repository ships with the Toyota Community pages in [`sentinel.config.ts`](./sentinel.config.ts).
+Replace them with your own site, either from its sitemap (recommended):
+
+```bash
+pnpm sentinel:init https://www.your-site.com --force
+```
+
+or by editing `site` and `pages` by hand (see [Configuration](#configuration)). In both cases open
+`sentinel.config.ts` afterwards and remove the pages that require a login or are not worth
+measuring: every page costs about 75 seconds per run.
+
+### 4. Run
+
+```bash
 pnpm dev                     # http://localhost:3000
 ```
 
-Click **Run now** in the top bar. A full run of 8 pages × 2 devices × 3 samples takes roughly
-5–10 minutes because PSI is slow and requests are spaced out to respect the quota. The overview
-page refreshes itself while a run is in progress.
+Click **Run now** in the top bar. A run of 8 pages × 2 devices × 3 samples takes roughly 10
+minutes because PSI is slow and requests are spaced out to respect the quota; the overview page
+refreshes itself while a run is in progress. Results are stored in `.data/sentinel.db` on the
+machine that runs the app, so each installation has its own history. Regression alerts appear from
+the third run (two previous runs are needed as a baseline).
 
 For an always-on local service, build once and run the compiled server:
 
@@ -65,7 +97,7 @@ For a new site, let the sitemap propose the list instead of writing it by hand:
 pnpm sentinel:init https://www.example.com
 ```
 
-It reads `robots.txt` (`Sitemap:` lines, falling back to `/sitemap.xml`), follows sitemap indexes and keeps one representative URL per page _template_: `/blog/post-a`, `/blog/post-b`, … become a single `/blog/*` entry (numeric/UUID segments, and segments with more than 3 distinct values under the same parent, are treated as parameters; top-level sections are always kept). It writes `site` and `pages` into `sentinel.config.ts` when the page list is empty (`--force` to overwrite), otherwise it prints the snippet. Review the result: delete pages behind a login or of no interest, and rename ids/labels as you like.
+It reads `robots.txt` (`Sitemap:` lines, falling back to `/sitemap.xml`), follows sitemap indexes and keeps one representative URL per page _template_: `/blog/post-a`, `/blog/post-b`, … become a single `/blog/*` entry (numeric/UUID segments, and segments with more than 3 distinct values under the same parent, are treated as parameters; top-level sections are always kept). It writes `site` and `pages` into `sentinel.config.ts` when the page list is empty; if the file already has pages (as in a fresh clone, which contains the Toyota Community pages) it only prints the snippet, and `--force` makes it overwrite them. Review the result: delete pages behind a login or of no interest, and rename ids/labels as you like.
 
 ## How regressions are detected
 
