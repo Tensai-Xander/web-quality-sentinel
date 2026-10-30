@@ -12,6 +12,8 @@ export interface AlertIssue {
 defineProps<{
   alerts: Alert[]
   showRun?: boolean
+  /** Site the alerts belong to (for page labels). */
+  siteId?: string | null
   /** Optional: Lighthouse issues that affect the alert's metric, shown under the message. */
   issuesFor?: (alert: Alert) => AlertIssue[]
 }>()
@@ -44,7 +46,7 @@ const { pageLabel } = useSentinel()
           <span class="pill" :class="a.severity">{{ a.severity }}</span>
         </td>
         <td>{{ a.kind }}</td>
-        <td :title="a.url">{{ pageLabel(a.pageId) }}</td>
+        <td :title="a.url">{{ pageLabel(a.pageId, siteId) }}</td>
         <td>{{ a.strategy }}</td>
         <td>{{ METRIC_LABELS[a.metric as keyof typeof METRIC_LABELS] ?? a.metric }}</td>
         <td class="num">{{ formatMetric(a.metric, a.actual) }}</td>

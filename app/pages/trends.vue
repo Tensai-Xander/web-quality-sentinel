@@ -13,19 +13,20 @@ interface Trends {
   results: Omit<PageResult, 'details'>[]
 }
 
-const { config } = useSentinel()
+const { config, site, siteId } = useSentinel()
 const strategy = ref<'mobile' | 'desktop'>('mobile')
 const metric = ref<Metric>('performance')
 const limit = ref(30)
 const selectedPages = ref<string[]>([])
 
 const { data } = await useFetch<Trends>('/api/trends', {
-  query: { strategy, limit },
+  query: { strategy, limit, site: siteId },
   default: () => ({ runs: [], results: [] }),
-  watch: [strategy, limit],
+  watch: [strategy, limit, siteId],
 })
 
-const pages = computed(() => config.value?.pages ?? [])
+const pages = computed(() => site.value?.pages ?? [])
+watch(siteId, () => (selectedPages.value = []))
 const visiblePages = computed(() =>
   pages.value.filter((p) => !selectedPages.value.length || selectedPages.value.includes(p.id))
 )
@@ -50,8 +51,8 @@ const series = computed(() =>
 )
 
 const threshold = computed(() => {
-  const t = config.value?.thresholds as Record<string, number> | undefined
-  return t?.[metric.value] ?? null
+  const t = { ...config.value?.thresholds, ...site.value?.thresholds } as Record<string, number>
+  return t[metric.value] ?? null
 })
 
 function togglePage(id: string) {
@@ -65,7 +66,7 @@ function togglePage(id: string) {
   <div>
     <section class="card">
       <div class="card-header">
-        <h1>Trends</h1>
+        <h1>Trends — {{ site?.name }}</h1>
         <div class="row">
           <select v-model="metric">
             <optgroup label="Scores">

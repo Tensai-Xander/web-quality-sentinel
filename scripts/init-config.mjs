@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
- * Bootstrap the `site` and `pages` blocks of sentinel.config.ts from a site's sitemap.
+ * Add a site (with its pages) to the `sites` list of sentinel.config.ts from its sitemap.
  *
  *   pnpm sentinel:init https://www.example.com [--force]
  *
  * Reads robots.txt for `Sitemap:` entries (falls back to /sitemap.xml), follows
  * sitemap indexes, then keeps one representative URL per page template so a
  * sitemap with thousands of articles yields a short list (one home, one article,
- * one category page, ...). Writes to sentinel.config.ts only when its `pages`
- * list is empty or --force is given; otherwise it prints the snippet.
+ * one category page, ...). The site is appended to `sites`; if a site with the
+ * same id already exists the snippet is only printed, unless --force is given,
+ * in which case that entry is replaced.
  */
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
@@ -161,8 +162,11 @@ function pickRepresentatives(entries) {
 }
 
 function toId(template, repPath, used) {
-  let words = template.split('/').filter((s) => s && s !== '*')
-  if (!words.length) words = repPath.split('/').filter((s) => s && !PARAM_LIKE.test(s))
+  // Templates with parameters are named after their representative (/services/* → services-kinto-go)
+  let words = template.includes('*')
+    ? repPath.split('/').filter((s) => s && !PARAM_LIKE.test(s))
+    : template.split('/').filter((s) => s)
+  if (!words.length) words = template.split('/').filter((s) => s && s !== '*')
   let id =
     words
       .join('-')
@@ -182,23 +186,45 @@ function toLabel(id) {
     .join(' ')
 }
 
-function siteName(url) {
-  const host = url.hostname.replace(/^www\./, '')
-  return host
+function siteId(url) {
+  return url.hostname
+    .replace(/^www\./, '')
     .split('.')[0]
+    .toLowerCase()
+}
+
+function siteName(url) {
+  return siteId(url)
     .split('-')
     .map((w) => w[0].toUpperCase() + w.slice(1))
     .join(' ')
 }
 
-function renderSnippet(pages) {
-  const lines = pages.map((p) => `    { id: '${p.id}', label: '${p.label}', path: '${p.path}' },`)
-  return (
-    `  site: {\n    name: '${siteName(base)}',\n    baseUrl: '${origin}',\n  },\n\n` +
-    `  // Pages monitored on every run. Keep this list short: each page costs\n` +
-    `  // samples × strategies PSI requests (default 3 × 2 = 6 requests per page).\n` +
-    `  pages: [\n${lines.join('\n')}\n  ],`
-  )
+const MAX_LINE = 100 // keep the generated file prettier-clean
+
+function renderPage(p) {
+  const oneLine = `        { id: '${p.id}', label: '${p.label}', path: '${p.path}' },`
+  if (oneLine.length <= MAX_LINE) return oneLine
+  return [
+    '        {',
+    `          id: '${p.id}',`,
+    `          label: '${p.label}',`,
+    `          path: '${p.path}',`,
+    '        },',
+  ].join('\n')
+}
+
+function renderSnippet(id, pages) {
+  return [
+    '    {',
+    `      id: '${id}',`,
+    `      name: '${siteName(base)}',`,
+    `      baseUrl: '${origin}',`,
+    '      pages: [',
+    ...pages.map(renderPage),
+    '      ],',
+    '    },',
+  ].join('\n')
 }
 
 const sitemaps = await discoverSitemaps()
@@ -221,21 +247,35 @@ console.log(
   `\nEstimated full run: ${pages.length} pages × ${CALLS_PER_PAGE} PSI calls ≈ ${minutes} min\n`
 )
 
-const snippet = renderSnippet(pages)
+const id = siteId(base)
+const snippet = renderSnippet(id, pages)
 const config = await readFile(CONFIG_PATH, 'utf8')
-const siteRe = / {2}site: \{[\s\S]*?\n {2}\},\n\n?/
-const pagesRe = /( {2}\/\/ Pages monitored[\s\S]*?)? {2}pages: \[[\s\S]*?\n {2}\],/
-const hasPages = / {2}pages: \[\s*\{/.test(config)
-if (hasPages && !force) {
-  console.log('sentinel.config.ts already has pages; not overwriting (use --force). Snippet:\n')
-  console.log(snippet)
-} else if (siteRe.test(config) && pagesRe.test(config)) {
-  const next = config.replace(siteRe, '').replace(pagesRe, snippet)
-  await writeFile(CONFIG_PATH, next)
+const existingRe = new RegExp(`\\n {4}\\{\\n {6}id: '${id}',[\\s\\S]*?\\n {4}\\},`)
+const emptyRe = / {2}sites: \[\s*\],/
+const open = config.indexOf('  sites: [')
+const close = open >= 0 ? config.indexOf('\n  ],', open) : -1
+
+if (existingRe.test(config) && !force) {
   console.log(
-    `Wrote site + ${pages.length} pages to sentinel.config.ts. Review the list, then run pnpm dev.`
+    `sentinel.config.ts already has a site '${id}'; not overwriting (use --force). Snippet:\n`
+  )
+  console.log(snippet)
+} else if (existingRe.test(config)) {
+  await writeFile(CONFIG_PATH, config.replace(existingRe, '\n' + snippet))
+  console.log(
+    `Replaced site '${id}' (${pages.length} pages) in sentinel.config.ts. Review the list, then run pnpm dev.`
+  )
+} else if (emptyRe.test(config)) {
+  await writeFile(CONFIG_PATH, config.replace(emptyRe, `  sites: [\n${snippet}\n  ],`))
+  console.log(
+    `Added site '${id}' (${pages.length} pages) to sentinel.config.ts. Review the list, then run pnpm dev.`
+  )
+} else if (open >= 0 && close > open) {
+  await writeFile(CONFIG_PATH, config.slice(0, close) + '\n' + snippet + config.slice(close))
+  console.log(
+    `Added site '${id}' (${pages.length} pages) to sentinel.config.ts. Review the list, then run pnpm dev.`
   )
 } else {
-  console.log('Could not locate the site/pages blocks in sentinel.config.ts. Snippet:\n')
+  console.log('Could not locate the sites list in sentinel.config.ts. Snippet:\n')
   console.log(snippet)
 }

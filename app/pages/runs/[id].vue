@@ -17,8 +17,16 @@ interface RunDetail {
 
 const route = useRoute()
 const id = Number(route.params.id)
-const { pageLabel, config } = useSentinel()
+const { pageLabel, config, siteId, siteName } = useSentinel()
 const { data, refresh, error } = await useFetch<RunDetail>(`/api/runs/${id}`)
+// Viewing a run selects its site, so Overview/Trends/Compare stay consistent with it.
+watch(
+  () => data.value?.run.siteId,
+  (s) => {
+    if (s && s !== siteId.value) siteId.value = s
+  },
+  { immediate: true }
+)
 
 const expanded = ref<number | null>(null)
 const sorted = computed(() =>
@@ -70,7 +78,7 @@ onUnmounted(() => clearInterval(timer))
           <div>
             <h1>Run #{{ data.run.id }} <RunStatusPill :status="data.run.status" /></h1>
             <div class="muted small">
-              {{ data.run.trigger }}
+              {{ siteName(data.run.siteId) }} · {{ data.run.trigger }}
               <template v-if="data.run.releaseTag"> · release {{ data.run.releaseTag }}</template>
               · {{ formatDate(data.run.startedAt) }} ·
               {{ formatDuration(data.run.startedAt, data.run.finishedAt) }} ·
@@ -101,7 +109,7 @@ onUnmounted(() => clearInterval(timer))
             <template v-for="r in sorted" :key="r.id">
               <tr class="clickable" @click="expanded = expanded === r.id ? null : r.id">
                 <td>
-                  <strong>{{ pageLabel(r.pageId) }}</strong>
+                  <strong>{{ pageLabel(r.pageId, data.run.siteId) }}</strong>
                   <span
                     v-if="r.noindex"
                     class="pill"
@@ -186,7 +194,7 @@ onUnmounted(() => clearInterval(timer))
 
       <section class="card">
         <h2>Alerts ({{ data.alerts.length }})</h2>
-        <AlertTable :alerts="data.alerts" :issues-for="issuesFor" />
+        <AlertTable :alerts="data.alerts" :site-id="data.run.siteId" :issues-for="issuesFor" />
         <p class="muted small" style="margin-top: 0.5rem">
           Thresholds and regression rules are defined in <code>sentinel.config.ts</code>.
           Regressions compare with the median of the previous

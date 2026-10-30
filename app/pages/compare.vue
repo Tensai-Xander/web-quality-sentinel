@@ -11,9 +11,9 @@ interface Compare {
 
 const route = useRoute()
 const router = useRouter()
-const { config, pageLabel } = useSentinel()
+const { site, siteId, pageLabel } = useSentinel()
 const { data: runs } = await useFetch<Run[]>('/api/runs', {
-  query: { limit: 200 },
+  query: { limit: 200, site: siteId },
   default: () => [],
 })
 const completed = computed(() => runs.value.filter((r) => r.status === 'completed'))
@@ -23,6 +23,12 @@ const from = ref<number | null>(
   Number(route.query.from) || (completed.value.find((r) => r.id !== to.value)?.id ?? null)
 )
 watch([from, to], () => router.replace({ query: { from: from.value ?? '', to: to.value ?? '' } }))
+// Switching site: pick that site's two most recent completed runs.
+watch(completed, (list) => {
+  if (list.some((r) => r.id === to.value) && list.some((r) => r.id === from.value)) return
+  to.value = list[0]?.id ?? null
+  from.value = list.find((r) => r.id !== to.value)?.id ?? null
+})
 
 const { data } = await useFetch<Compare>('/api/compare', {
   query: { from, to },
@@ -47,7 +53,7 @@ function runLabel(r: Run) {
   <div>
     <section class="card">
       <div class="card-header">
-        <h1>Compare runs</h1>
+        <h1>Compare runs — {{ site?.name }}</h1>
         <div class="row">
           <label class="small muted">From</label>
           <select v-model.number="from">
@@ -77,9 +83,9 @@ function runLabel(r: Run) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in config?.pages ?? []" :key="p.id">
+          <tr v-for="p in site?.pages ?? []" :key="p.id">
             <td>
-              <strong>{{ pageLabel(p.id) }}</strong>
+              <strong>{{ pageLabel(p.id, siteId) }}</strong>
               <div class="muted small">{{ p.path }}</div>
             </td>
             <td v-for="m in metrics" :key="m" class="num">

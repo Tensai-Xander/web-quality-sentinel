@@ -27,7 +27,7 @@ export interface PageConfig {
   label: string
   /** Path relative to the site baseUrl (or an absolute URL). */
   path: string
-  /** Optional per-page overrides of the global thresholds. */
+  /** Optional per-page overrides of the site/global thresholds. */
   thresholds?: Partial<Thresholds>
 }
 
@@ -55,12 +55,22 @@ export interface RegressionRules {
   minDelta: Partial<Record<TimingMetric, number>>
 }
 
-export interface SentinelConfig {
-  site: {
-    name: string
-    baseUrl: string
-  }
+export interface SiteConfig {
+  /** Stable identifier stored with every run, e.g. "toyota-community". */
+  id: string
+  /** Human label shown in the site selector. */
+  name: string
+  /** Origin the page paths are appended to, without trailing slash. */
+  baseUrl: string
+  /** Pages monitored on every run of this site. */
   pages: PageConfig[]
+  /** Optional per-site overrides of the global thresholds. */
+  thresholds?: Partial<Thresholds>
+}
+
+export interface SentinelConfig {
+  /** Monitored websites. Each has its own pages and run history; the first one is selected by default. */
+  sites: SiteConfig[]
   strategies: Strategy[]
   psi: {
     /** How many PSI requests per page × strategy; the median is stored. */

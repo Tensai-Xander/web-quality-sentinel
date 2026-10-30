@@ -309,3 +309,7 @@ select {
   height: 260px;
   position: relative;
 }
+
+.topbar .site-select {
+  font-weight: 600;
+}

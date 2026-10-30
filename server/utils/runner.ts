@@ -1,18 +1,24 @@
 import { and, desc, eq, inArray, ne } from 'drizzle-orm'
-import type { RunTrigger, Strategy } from '~~/shared/types/sentinel'
+import type { PageConfig, RunTrigger, SiteConfig, Strategy } from '~~/shared/types/sentinel'
 import { useDb, schema } from '../db'
 import type { PsiError, PsiSample } from './psi'
 import { checkRegressions, checkThresholds, type Finding, type MetricValues } from './regression'
-import { pageUrl, thresholdsFor, useSentinelConfig } from './sentinelConfig'
+import { getSite, pageUrl, thresholdsFor, useSentinelConfig } from './sentinelConfig'
 
-let activeRunId: number | null = null
+let activeRun: { id: number; siteId: string } | null = null
+
+export function getActiveRun() {
+  return activeRun
+}
 
 export function getActiveRunId() {
-  return activeRunId
+  return activeRun?.id ?? null
 }
 
 interface StartOptions {
   trigger: RunTrigger
+  /** SiteConfig.id; defaults to the first configured site. */
+  siteId?: string | null
   releaseTag?: string | null
   /** Restrict to these page ids (defaults to every configured page). */
   pageIds?: string[]
@@ -20,15 +26,17 @@ interface StartOptions {
 
 /** Creates the run row and processes it in the background. Returns the run id immediately. */
 export function startRun(opts: StartOptions): { runId: number; started: boolean } {
-  if (activeRunId != null) return { runId: activeRunId, started: false }
+  const site = getSite(opts.siteId) // 404 on unknown site, before the busy check
+  if (activeRun) return { runId: activeRun.id, started: false }
 
   const config = useSentinelConfig()
   const db = useDb()
-  const pages = config.pages.filter((p) => !opts.pageIds?.length || opts.pageIds.includes(p.id))
+  const pages = site.pages.filter((p) => !opts.pageIds?.length || opts.pageIds.includes(p.id))
   const now = new Date().toISOString()
   const run = db
     .insert(schema.runs)
     .values({
+      siteId: site.id,
       trigger: opts.trigger,
       releaseTag: opts.releaseTag ?? null,
       status: 'running',
@@ -38,10 +46,11 @@ export function startRun(opts: StartOptions): { runId: number; started: boolean 
     })
     .returning()
     .get()
-  activeRunId = run.id
+  activeRun = { id: run.id, siteId: site.id }
 
   processRun(
     run.id,
+    site,
     pages.map((p) => p.id)
   ).catch((err) => {
     console.error('[sentinel] run failed', err)
@@ -57,17 +66,17 @@ export function startRun(opts: StartOptions): { runId: number; started: boolean 
   return { runId: run.id, started: true }
 }
 
-async function processRun(runId: number, pageIds: string[]) {
+async function processRun(runId: number, site: SiteConfig, pageIds: string[]) {
   const config = useSentinelConfig()
   const db = useDb()
   const { psiApiKey } = useRuntimeConfig()
-  const pages = config.pages.filter((p) => pageIds.includes(p.id))
+  const pages = site.pages.filter((p) => pageIds.includes(p.id))
   let fatal: string | null = null
 
   try {
     for (const page of pages) {
       for (const strategy of config.strategies) {
-        const url = pageUrl(page)
+        const url = pageUrl(site, page)
         const samples: PsiSample[] = []
         let error: string | null = null
 
@@ -88,7 +97,7 @@ async function processRun(runId: number, pageIds: string[]) {
         }
 
         const resultId = storeResult(runId, page.id, url, strategy, samples, error)
-        if (samples.length) evaluate(runId, resultId, page.id, url, strategy)
+        if (samples.length) evaluate(runId, site, page, resultId, url, strategy)
 
         db.update(schema.runs)
           .set({ checksDone: countDone(runId) })
@@ -109,7 +118,7 @@ async function processRun(runId: number, pageIds: string[]) {
       .where(eq(schema.runs.id, runId))
       .run()
   } finally {
-    activeRunId = null
+    activeRun = null
   }
 }
 
@@ -178,14 +187,15 @@ function toValues(row: Partial<schema.PageResult>): MetricValues {
 
 function evaluate(
   runId: number,
+  site: SiteConfig,
+  page: PageConfig,
   resultId: number,
-  pageId: string,
   url: string,
   strategy: Strategy
 ) {
   const config = useSentinelConfig()
   const db = useDb()
-  const page = config.pages.find((p) => p.id === pageId)!
+  const pageId = page.id
   const current = db
     .select()
     .from(schema.pageResults)
@@ -198,7 +208,13 @@ function evaluate(
   const previousRunIds = db
     .select({ id: schema.runs.id })
     .from(schema.runs)
-    .where(and(eq(schema.runs.status, 'completed'), ne(schema.runs.id, runId)))
+    .where(
+      and(
+        eq(schema.runs.siteId, site.id),
+        eq(schema.runs.status, 'completed'),
+        ne(schema.runs.id, runId)
+      )
+    )
     .orderBy(desc(schema.runs.id))
     .limit(config.regression.baselineRuns)
     .all()
@@ -221,7 +237,7 @@ function evaluate(
     : []
 
   const findings: Finding[] = [
-    ...checkThresholds(values, thresholdsFor(page)),
+    ...checkThresholds(values, thresholdsFor(site, page)),
     ...checkRegressions(values, history, config.regression),
   ]
   if (!findings.length) return

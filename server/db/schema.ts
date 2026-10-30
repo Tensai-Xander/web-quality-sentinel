@@ -1,16 +1,21 @@
 import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core'
 
-export const runs = sqliteTable('runs', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  trigger: text('trigger').notNull(), // manual | release
-  releaseTag: text('release_tag'),
-  status: text('status').notNull(), // running | completed | failed
-  startedAt: text('started_at').notNull(),
-  finishedAt: text('finished_at'),
-  error: text('error'),
-  checksTotal: integer('checks_total').notNull().default(0),
-  checksDone: integer('checks_done').notNull().default(0),
-})
+export const runs = sqliteTable(
+  'runs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    siteId: text('site_id').notNull(), // SiteConfig.id from sentinel.config.ts
+    trigger: text('trigger').notNull(), // manual | release
+    releaseTag: text('release_tag'),
+    status: text('status').notNull(), // running | completed | failed
+    startedAt: text('started_at').notNull(),
+    finishedAt: text('finished_at'),
+    error: text('error'),
+    checksTotal: integer('checks_total').notNull().default(0),
+    checksDone: integer('checks_done').notNull().default(0),
+  },
+  (t) => [index('runs_site_idx').on(t.siteId)]
+)
 
 export const pageResults = sqliteTable(
   'page_results',

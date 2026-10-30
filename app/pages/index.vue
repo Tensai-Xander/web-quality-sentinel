@@ -10,9 +10,9 @@ interface RunDetail {
   alerts: Alert[]
 }
 
-const { config, pageLabel } = useSentinel()
+const { config, site, siteId } = useSentinel()
 const { data: runs, refresh: refreshRuns } = await useFetch<RunRow[]>('/api/runs', {
-  query: { limit: 20 },
+  query: { limit: 20, site: siteId },
   default: () => [],
 })
 
@@ -44,7 +44,7 @@ function alertsFor(pageId: string) {
 let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   timer = setInterval(async () => {
-    if (config.value?.activeRunId != null || latest.value?.run.status === 'running') {
+    if (config.value?.activeRun != null || latest.value?.run.status === 'running') {
       await refreshRuns()
       await refreshLatest()
     }
@@ -57,7 +57,7 @@ onUnmounted(() => clearInterval(timer))
   <div>
     <div v-if="!runs.length" class="card empty">
       <h2>No runs yet</h2>
-      <p>Click <strong>Run now</strong> to launch the first check of {{ config?.site.name }}.</p>
+      <p>Click <strong>Run now</strong> to launch the first check of {{ site?.name }}.</p>
       <p v-if="config && !config.hasApiKey" class="small">
         ⚠ No PageSpeed API key configured (<code>NUXT_PSI_API_KEY</code>). Requests may be rejected
         with 429 — see <NuxtLink to="/settings">Settings</NuxtLink>.
@@ -120,7 +120,7 @@ onUnmounted(() => clearInterval(timer))
             </tr>
           </thead>
           <tbody>
-            <tr v-for="p in config?.pages ?? []" :key="p.id">
+            <tr v-for="p in site?.pages ?? []" :key="p.id">
               <td>
                 <strong>{{ p.label }}</strong>
                 <div class="muted small">{{ p.path }}</div>
@@ -168,12 +168,12 @@ onUnmounted(() => clearInterval(timer))
 
       <section v-if="latest.alerts.length" class="card">
         <h2>Alerts in this run</h2>
-        <AlertTable :alerts="latest.alerts" />
+        <AlertTable :alerts="latest.alerts" :site-id="siteId" />
       </section>
     </template>
 
     <section v-if="runs.length" class="card">
-      <h2>Recent runs</h2>
+      <h2>Recent runs — {{ site?.name }}</h2>
       <table>
         <thead>
           <tr>
@@ -209,8 +209,8 @@ onUnmounted(() => clearInterval(timer))
         </tbody>
       </table>
       <p class="muted small" style="margin-top: 0.5rem">
-        {{ pageLabel('home') ? '' : '' }}Pages × devices: {{ config?.pages.length }} ×
-        {{ config?.strategies.length }} · {{ config?.psi.samples }} samples each
+        Pages × devices: {{ site?.pages.length }} × {{ config?.strategies.length }} ·
+        {{ config?.psi.samples }} samples each
       </p>
     </section>
   </div>

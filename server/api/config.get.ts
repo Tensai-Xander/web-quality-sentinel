@@ -2,8 +2,15 @@ export default defineEventHandler(() => {
   const config = useSentinelConfig()
   return {
     ...config,
-    pages: config.pages.map((p) => ({ ...p, url: pageUrl(p), thresholds: thresholdsFor(p) })),
+    sites: config.sites.map((site) => ({
+      ...site,
+      pages: site.pages.map((p) => ({
+        ...p,
+        url: pageUrl(site, p),
+        thresholds: thresholdsFor(site, p),
+      })),
+    })),
     hasApiKey: Boolean(useRuntimeConfig().psiApiKey),
-    activeRunId: getActiveRunId(),
+    activeRun: getActiveRun(),
   }
 })

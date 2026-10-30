@@ -17,12 +17,14 @@ const timingThresholds = ['lcp', 'cls', 'tbt', 'fcp'] as const
       <table>
         <tbody>
           <tr>
-            <th>Site</th>
+            <th>Sites</th>
             <td>
-              {{ config.site.name }} —
-              <a :href="config.site.baseUrl" target="_blank" rel="noopener">{{
-                config.site.baseUrl
-              }}</a>
+              <div v-for="s in config.sites" :key="s.id">
+                {{ s.name }} (<code>{{ s.id }}</code
+                >) —
+                <a :href="s.baseUrl" target="_blank" rel="noopener">{{ s.baseUrl }}</a>
+                · {{ s.pages.length }} pages
+              </div>
             </td>
           </tr>
           <tr>
@@ -44,15 +46,18 @@ const timingThresholds = ['lcp', 'cls', 'tbt', 'fcp'] as const
             <th>Release trigger</th>
             <td>
               <code>POST /api/runs</code> with
-              <code>{ "trigger": "release", "releaseTag": "v1.2.3" }</code>
+              <code
+                >{ "siteId": "{{ config.sites[0]?.id }}", "trigger": "release", "releaseTag":
+                "v1.2.3" }</code
+              >
             </td>
           </tr>
         </tbody>
       </table>
     </section>
 
-    <section class="card">
-      <h2>Thresholds</h2>
+    <section v-for="s in config.sites" :key="s.id" class="card">
+      <h2>Thresholds — {{ s.name }}</h2>
       <table>
         <thead>
           <tr>
@@ -62,7 +67,7 @@ const timingThresholds = ['lcp', 'cls', 'tbt', 'fcp'] as const
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in config.pages" :key="p.id">
+          <tr v-for="p in s.pages" :key="p.id">
             <td>
               <strong>{{ p.label }}</strong>
               <div class="muted small">{{ p.url }}</div>
