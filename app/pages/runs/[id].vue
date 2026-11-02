@@ -201,15 +201,17 @@ onUnmounted(() => clearInterval(timer))
                               — ~{{ Math.round(o.savingsMs) }} ms</template
                             >
                           </span>
-                          <IssueDetail
-                            v-if="openOpportunity === `${r.id}:${o.id}`"
-                            :description="o.description"
-                            :details="o.details"
-                          />
                         </li>
                       </ul>
                     </div>
                   </div>
+                  <template v-for="o in r.details.opportunities" :key="o.id">
+                    <IssueDetail
+                      v-if="openOpportunity === `${r.id}:${o.id}`"
+                      :description="o.description"
+                      :details="o.details"
+                    />
+                  </template>
                 </td>
               </tr>
             </template>
