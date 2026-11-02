@@ -21,8 +21,8 @@ const config: SentinelConfig = {
           path: '/community/1/channel/1/post/157/discussions',
         },
         {
-          id: 'post-channel-5',
-          label: 'Post (channel 5)',
+          id: 'article',
+          label: 'Article',
           path: '/community/1/channel/5/post/153/discussions',
         },
         { id: 'garage-posts', label: 'Garage posts', path: '/garage/posts' },
