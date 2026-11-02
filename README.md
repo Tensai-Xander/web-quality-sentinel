@@ -40,16 +40,19 @@ cp .env.example .env         # then put your key in NUXT_PSI_API_KEY=
 
 ### 3. Add your site and choose the pages to monitor
 
-Sites live in the `sites` list of [`sentinel.config.ts`](./sentinel.config.ts); the repository
-ships with two examples (Toyota Community and KINTO Mobility) that you can keep or delete. Add
-yours from its sitemap (recommended):
+Sites and their pages live in [`sentinel.sites.json`](./sentinel.sites.json); the repository ships
+with two examples (Toyota Community and KINTO Mobility) that you can keep or remove. Easiest is the
+dashboard: start it (step 4), open **Settings**, "Add a site" with its URL — the app reads the
+site's sitemap and proposes one page per kind of page; tick the ones to monitor. Pages and sites
+can be added, edited and removed there at any time; changes apply to the next run. The same import
+exists as a command:
 
 ```bash
 pnpm sentinel:init https://www.your-site.com
 ```
 
-or by hand (see [Configuration](#configuration)). Then open `sentinel.config.ts`, and remove the
-pages that require a login or are not worth measuring: every page costs about 75 seconds per run.
+Leave out pages that require a login or are not worth measuring: every page costs about 75 seconds
+per run.
 
 ### 4. Run
 
@@ -73,18 +76,20 @@ pnpm start                   # same URL, no file watching
 
 ## Configuration
 
-Everything lives in [`sentinel.config.ts`](./sentinel.config.ts):
+Sites and pages are in [`sentinel.sites.json`](./sentinel.sites.json) (written by the Settings
+page and by `pnpm sentinel:init`; it is plain JSON, so it can also be edited by hand and shared
+through git). The global rules live in [`sentinel.config.ts`](./sentinel.config.ts):
 
 | Key          | What it does                                                                                                                                                                                                                                                                    |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sites`      | Monitored websites: `id` (stored with every run — keep it stable), `name`, `baseUrl`, `pages`, optional `thresholds` overrides. The first site is selected by default in the dashboard.                                                                                         |
-| `pages`      | Per site: `id` (stable key of the page's history), `label`, `path` (appended to `baseUrl`), optional per-page `thresholds`.                                                                                                                                                     |
+| `sites`      | _(in `sentinel.sites.json`)_ `id` (stored with every run — keep it stable), `name`, `baseUrl`, `pages`, optional `thresholds` overrides. The first site is selected by default in the dashboard.                                                                                |
+| `pages`      | _(per site, in `sentinel.sites.json`)_ `id` (stable key of the page's history), `label`, `path` (appended to `baseUrl`), optional per-page `thresholds`. Editable in Settings.                                                                                                  |
 | `strategies` | `['mobile', 'desktop']` — remove one to halve the number of PSI requests.                                                                                                                                                                                                       |
 | `psi`        | `samples` (median is stored), `delayMs` between requests, Lighthouse `categories`.                                                                                                                                                                                              |
 | `thresholds` | Absolute limits: minimum scores (0–100) and maximum LCP/CLS/TBT/FCP. Defaults are Lighthouse's red ("poor") boundaries. Breaches raise _threshold_ alerts. Pages that are not indexable (`noindex`, detected via the Lighthouse `is-crawlable` audit) are never alerted on SEO. |
 | `regression` | Relative limits vs. the baseline (median of the previous `baselineRuns` completed runs).                                                                                                                                                                                        |
 
-Restart the dev server after editing the file. Environment variables (`.env`):
+Restart the dev server after editing `sentinel.config.ts` (`sentinel.sites.json` is re-read automatically). Environment variables (`.env`):
 
 | Variable            | Purpose                                                              |
 | ------------------- | -------------------------------------------------------------------- |
@@ -94,13 +99,13 @@ Restart the dev server after editing the file. Environment variables (`.env`):
 
 ### Adding a site from its sitemap
 
-Let the sitemap propose the page list instead of writing it by hand:
+Settings → "Add a site" does this in the dashboard. From the command line:
 
 ```bash
 pnpm sentinel:init https://www.example.com
 ```
 
-It reads `robots.txt` (`Sitemap:` lines, falling back to `/sitemap.xml`), follows sitemap indexes and keeps one representative URL per page _template_: `/blog/post-a`, `/blog/post-b`, … become a single `/blog/*` entry (numeric/UUID segments, and segments with more than 3 distinct values under the same parent, are treated as parameters; top-level sections are always kept). It appends the site (id derived from the host name, e.g. `kinto-mobility`) to the `sites` list of `sentinel.config.ts`. If a site with that id already exists it only prints the snippet; `--force` replaces the existing entry (its history is kept, as it is linked to the site id). Review the result: delete pages behind a login or of no interest, and rename ids/labels as you like.
+It reads `robots.txt` (`Sitemap:` lines, falling back to `/sitemap.xml`), follows sitemap indexes and keeps one representative URL per page _template_: `/blog/post-a`, `/blog/post-b`, … become a single `/blog/*` entry (numeric/UUID segments, and segments with more than 3 distinct values under the same parent, are treated as parameters; top-level sections are always kept). It appends the site (id derived from the host name, e.g. `kinto-mobility`) to `sentinel.sites.json`. If a site with that id already exists it only prints the snippet; `--force` replaces the existing entry (its history is kept, as it is linked to the site id). Review the result: delete pages behind a login or of no interest, and rename ids/labels as you like.
 
 ## How regressions are detected
 
@@ -130,16 +135,23 @@ run list and on the trend charts, which makes release-to-release comparison easy
 
 ## API
 
-| Method   | Path                          | Description                                                       |
-| -------- | ----------------------------- | ----------------------------------------------------------------- |
-| `GET`    | `/api/config`                 | Effective configuration, sites and pages (+ whether a key is set) |
-| `GET`    | `/api/runs?site=&limit=`      | Run list with alert counts (`site` optional: all sites if absent) |
-| `POST`   | `/api/runs`                   | Start a run (`siteId`, `trigger`, `releaseTag`, `pageIds`)        |
-| `GET`    | `/api/runs/:id`               | Run with page results (incl. samples) and alerts                  |
-| `DELETE` | `/api/runs/:id`               | Delete a run and its data                                         |
-| `GET`    | `/api/trends?site=&strategy=` | Metric history per page of one site for the trend charts          |
-| `GET`    | `/api/compare?from=&to=`      | Results of two runs side by side                                  |
-| `GET`    | `/api/alerts?site=&limit=`    | Latest alerts (`site` optional)                                   |
+| Method   | Path                           | Description                                                       |
+| -------- | ------------------------------ | ----------------------------------------------------------------- |
+| `GET`    | `/api/config`                  | Effective configuration, sites and pages (+ whether a key is set) |
+| `GET`    | `/api/runs?site=&limit=`       | Run list with alert counts (`site` optional: all sites if absent) |
+| `POST`   | `/api/runs`                    | Start a run (`siteId`, `trigger`, `releaseTag`, `pageIds`)        |
+| `GET`    | `/api/runs/:id`                | Run with page results (incl. samples) and alerts                  |
+| `DELETE` | `/api/runs/:id`                | Delete a run and its data                                         |
+| `GET`    | `/api/trends?site=&strategy=`  | Metric history per page of one site for the trend charts          |
+| `GET`    | `/api/compare?from=&to=`       | Results of two runs side by side                                  |
+| `GET`    | `/api/alerts?site=&limit=`     | Latest alerts (`site` optional)                                   |
+| `POST`   | `/api/sites`                   | Add a site (`baseUrl`, optional `name`, `id`, `pages`)            |
+| `PATCH`  | `/api/sites/:id`               | Edit a site's `name`, `baseUrl`, `thresholds`                     |
+| `DELETE` | `/api/sites/:id?deleteRuns=`   | Remove a site (history kept unless `deleteRuns=1`)                |
+| `POST`   | `/api/sites/:id/pages`         | Add a page `{ path, label?, id?, thresholds? }` or `{ pages }`    |
+| `PATCH`  | `/api/sites/:id/pages/:pageId` | Edit a page's `label`, `path`, `thresholds`                       |
+| `DELETE` | `/api/sites/:id/pages/:pageId` | Remove a page (`deleteRuns=1` also deletes its results)           |
+| `POST`   | `/api/sitemap`                 | Propose pages from a site's sitemap (`{ url }`)                   |
 
 ## Development without burning quota
 
@@ -158,7 +170,8 @@ Other useful commands: `pnpm lint`, `pnpm lintfix`, `pnpm typecheck`, `pnpm db:s
 ## Project layout
 
 ```
-sentinel.config.ts      sites and their pages, thresholds, regression rules
+sentinel.sites.json     sites and their pages (edited from Settings / sentinel:init)
+sentinel.config.ts      thresholds, regression rules, PSI options
 shared/                 types and formatting helpers shared by server and UI
 server/db/              Drizzle schema + SQL migrations (applied automatically at startup)
 server/utils/psi.ts     PageSpeed Insights client and median aggregation
@@ -166,7 +179,8 @@ server/utils/regression.ts  threshold and baseline/regression rules
 server/utils/runner.ts  run orchestration (one run at a time, progress, error handling)
 server/api/             JSON API used by the dashboard and by CI
 app/                    Nuxt dashboard: overview, run detail, trends, compare, alerts, settings
-scripts/init-config.mjs add a site to the config from its sitemap
+scripts/init-config.mjs add a site from its sitemap (CLI twin of Settings → Add a site)
+scripts/lib/sitemap.mjs sitemap discovery and page-template grouping (shared with the server)
 scripts/mock-psi.mjs    fake PSI endpoint for development
 ```
 

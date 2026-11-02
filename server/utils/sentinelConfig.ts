@@ -1,14 +1,19 @@
 import config from '~~/sentinel.config'
 import type { PageConfig, SiteConfig, Thresholds } from '~~/shared/types/sentinel'
 
+/** Global rules (sentinel.config.ts). Sites come from sentinel.sites.json via loadSites(). */
 export function useSentinelConfig() {
   return config
 }
 
 /** Site by id; the first configured site when id is missing. Throws on unknown ids. */
 export function getSite(id?: string | null): SiteConfig {
-  if (id == null || id === '') return config.sites[0]!
-  const site = config.sites.find((s) => s.id === id)
+  const sites = loadSites()
+  if (id == null || id === '') {
+    if (!sites.length) throw createError({ statusCode: 404, statusMessage: 'No site configured' })
+    return sites[0]!
+  }
+  const site = sites.find((s) => s.id === id)
   if (!site) throw createError({ statusCode: 404, statusMessage: `Unknown site "${id}"` })
   return site
 }

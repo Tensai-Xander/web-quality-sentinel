@@ -2,7 +2,7 @@ export default defineEventHandler(() => {
   const config = useSentinelConfig()
   return {
     ...config,
-    sites: config.sites.map((site) => ({
+    sites: loadSites().map((site) => ({
       ...site,
       pages: site.pages.map((p) => ({
         ...p,
@@ -10,6 +10,8 @@ export default defineEventHandler(() => {
         thresholds: thresholdsFor(site, p),
       })),
     })),
+    sitesFile: SITES_FILE,
+    sitesError: sitesError(),
     hasApiKey: Boolean(useRuntimeConfig().psiApiKey),
     activeRun: getActiveRun(),
   }

@@ -6,6 +6,8 @@ export interface ClientSite extends Omit<SiteConfig, 'pages'> {
 }
 export interface ClientConfig extends Omit<SentinelConfig, 'sites'> {
   sites: ClientSite[]
+  sitesFile: string
+  sitesError: string | null
   hasApiKey: boolean
   activeRun: { id: number; siteId: string } | null
 }

@@ -56,7 +56,7 @@ export interface RegressionRules {
 }
 
 export interface SiteConfig {
-  /** Stable identifier stored with every run, e.g. "toyota-community". */
+  /** Stable identifier stored with every run, e.g. "toyota-community". Lowercase letters, digits, dashes. */
   id: string
   /** Human label shown in the site selector. */
   name: string
@@ -68,9 +68,13 @@ export interface SiteConfig {
   thresholds?: Partial<Thresholds>
 }
 
-export interface SentinelConfig {
-  /** Monitored websites. Each has its own pages and run history; the first one is selected by default. */
+/** Shape of sentinel.sites.json. */
+export interface SitesFile {
   sites: SiteConfig[]
+}
+
+/** Global rules from sentinel.config.ts (sites live in sentinel.sites.json). */
+export interface SentinelConfig {
   strategies: Strategy[]
   psi: {
     /** How many PSI requests per page × strategy; the median is stored. */

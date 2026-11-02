@@ -335,3 +335,39 @@ select {
 .issue-detail table {
   width: auto;
 }
+
+button.small {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.85em;
+  margin-left: 0.3rem;
+}
+.confirm {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.6rem 0.8rem;
+  background: #fafbfc;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+tr.editing td {
+  background: #fafbfc;
+  vertical-align: top;
+}
+tr.add-row td {
+  border-bottom: 0;
+  padding-top: 0.75rem;
+}
+
+td.edit-page {
+  white-space: normal;
+  min-width: 240px;
+}
+td.edit-page input {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.3rem;
+}
+.threshold-input {
+  width: 4.6em;
+  padding: 0.3rem 0.35rem;
+  text-align: right;
+}
