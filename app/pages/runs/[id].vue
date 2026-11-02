@@ -36,6 +36,14 @@ const sorted = computed(() =>
 )
 const metrics: Metric[] = [...SCORE_METRICS, ...TIMING_METRICS]
 
+const issueBase = (o: Opportunity) => ({
+  id: o.id,
+  title: o.title,
+  description: o.description ?? null,
+  details: o.details ?? null,
+})
+const openOpportunity = ref<string | null>(null)
+
 /** Lighthouse issues whose metricSavings touch the alert's metric, biggest impact first. */
 function issuesFor(a: Alert): AlertIssue[] {
   const result = data.value?.results.find((r) => r.id === a.pageResultId)
@@ -45,11 +53,11 @@ function issuesFor(a: Alert): AlertIssue[] {
     return ops
       .filter((o) => o.savingsMs || Object.values(o.metricSavings ?? {}).some((v) => v > 0))
       .slice(0, 5)
-      .map((o) => ({ id: o.id, title: o.title, savings: o.savingsMs }))
+      .map((o) => ({ ...issueBase(o), savings: o.savingsMs }))
   }
   return ops
     .filter((o) => (o.metricSavings?.[metric] ?? 0) > 0)
-    .map((o) => ({ id: o.id, title: o.title, savings: o.metricSavings[metric] ?? null }))
+    .map((o) => ({ ...issueBase(o), savings: o.metricSavings[metric] ?? null }))
     .sort((x, y) => (y.savings ?? 0) - (x.savings ?? 0))
     .slice(0, 5)
 }
@@ -172,15 +180,32 @@ onUnmounted(() => clearInterval(timer))
                     </div>
                     <div v-if="r.details.opportunities.length" style="flex: 1; min-width: 280px">
                       <h3>Top performance opportunities</h3>
+                      <p class="muted small" style="margin: 0 0 0.4rem">
+                        Click an issue for Lighthouse's explanation and per-URL breakdown.
+                      </p>
                       <ul class="small" style="margin: 0; padding-left: 1.1rem">
                         <li v-for="o in r.details.opportunities" :key="o.id">
-                          {{ o.title }}
+                          <span
+                            class="issue-toggle"
+                            :class="{ open: openOpportunity === `${r.id}:${o.id}` }"
+                            title="Show details"
+                            @click="
+                              openOpportunity =
+                                openOpportunity === `${r.id}:${o.id}` ? null : `${r.id}:${o.id}`
+                            "
+                            >{{ o.title }}</span
+                          >
                           <span class="muted">
                             <template v-if="o.displayValue"> — {{ o.displayValue }}</template>
                             <template v-else-if="o.savingsMs">
                               — ~{{ Math.round(o.savingsMs) }} ms</template
                             >
                           </span>
+                          <IssueDetail
+                            v-if="openOpportunity === `${r.id}:${o.id}`"
+                            :description="o.description"
+                            :details="o.details"
+                          />
                         </li>
                       </ul>
                     </div>

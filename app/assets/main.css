@@ -313,3 +313,25 @@ select {
 .topbar .site-select {
   font-weight: 600;
 }
+
+.issue-toggle {
+  cursor: pointer;
+  border-bottom: 1px dotted var(--muted, #888);
+}
+.issue-toggle:hover,
+.issue-toggle.open {
+  color: var(--accent);
+}
+.issue-detail {
+  margin: 0.4rem 0 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background: #fafbfc;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+.issue-detail p {
+  margin: 0 0 0.4rem;
+}
+.issue-detail table {
+  width: auto;
+}

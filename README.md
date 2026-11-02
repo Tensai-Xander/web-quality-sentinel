@@ -5,7 +5,8 @@ Monitors the quality of one or several websites over time and flags regressions.
 (Lighthouse) for the performance, accessibility, best-practices and SEO scores plus the lab
 timings (LCP, CLS, TBT, FCP, Speed Index, TTFB) of each configured page, on mobile and desktop.
 Results are stored in a local SQLite database and shown in a dashboard with history, trends,
-run-to-run comparison and alerts. Several sites can be monitored from the same dashboard (site
+run-to-run comparison and alerts. Each alert lists the Lighthouse issues that affect its metric,
+and each issue opens Lighthouse's explanation and per-URL breakdown (the same table PSI shows). Several sites can be monitored from the same dashboard (site
 selector in the top bar); each site has its own page list and its own history.
 
 Everything runs locally in a single Node process — no Docker, no external database, only free

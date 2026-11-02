@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Alert } from '~~/server/db/schema'
+import type { IssueDetails } from '~~/server/utils/psi'
 import { formatMetric, formatDate } from '~~/shared/utils/format'
 import { METRIC_LABELS } from '~~/shared/types/sentinel'
 
@@ -7,6 +8,8 @@ export interface AlertIssue {
   id: string
   title: string
   savings: number | null
+  description?: string | null
+  details?: IssueDetails | null
 }
 
 defineProps<{
@@ -18,6 +21,8 @@ defineProps<{
   issuesFor?: (alert: Alert) => AlertIssue[]
 }>()
 const { pageLabel } = useSentinel()
+const openIssue = ref<string | null>(null)
+const toggle = (key: string) => (openIssue.value = openIssue.value === key ? null : key)
 </script>
 
 <template>
@@ -61,10 +66,20 @@ const { pageLabel } = useSentinel()
             style="margin: 0.3rem 0 0; padding-left: 1.1rem"
           >
             <li v-for="i in issuesFor(a)" :key="i.id">
-              {{ i.title
-              }}<template v-if="i.savings">
+              <span
+                class="issue-toggle"
+                :class="{ open: openIssue === `${a.id}:${i.id}` }"
+                title="Show details"
+                @click="toggle(`${a.id}:${i.id}`)"
+                >{{ i.title }}</span
+              ><template v-if="i.savings">
                 — ~{{ a.metric === 'cls' ? i.savings.toFixed(3) : Math.round(i.savings) + ' ms' }}
               </template>
+              <IssueDetail
+                v-if="openIssue === `${a.id}:${i.id}`"
+                :description="i.description"
+                :details="i.details"
+              />
             </li>
           </ul>
         </td>

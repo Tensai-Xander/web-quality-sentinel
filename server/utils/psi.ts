@@ -2,6 +2,19 @@ import type { Strategy } from '~~/shared/types/sentinel'
 
 export type MetricSavings = Partial<Record<'lcp' | 'cls' | 'tbt' | 'fcp' | 'si' | 'inp', number>>
 
+export interface IssueHeading {
+  key: string
+  label: string
+  /** Lighthouse value type: url | ms | timespanMs | bytes | numeric | text | code | node | link */
+  valueType: string
+}
+export type IssueCell = string | number | null
+/** Per-URL breakdown of an audit, as PSI shows it (Lighthouse `details` of type table/opportunity). */
+export interface IssueDetails {
+  headings: IssueHeading[]
+  items: Record<string, IssueCell>[]
+}
+
 export interface Opportunity {
   id: string
   title: string
@@ -9,6 +22,9 @@ export interface Opportunity {
   displayValue: string | null
   /** Estimated impact per metric (Lighthouse `metricSavings`), ms except cls. */
   metricSavings: MetricSavings
+  /** Lighthouse explanation, Markdown with a "Learn more" link. */
+  description: string | null
+  details: IssueDetails | null
 }
 
 export interface PsiSample {
@@ -85,6 +101,46 @@ function metricSavings(audit: Json): MetricSavings {
   return out
 }
 
+const MAX_DETAIL_ROWS = 15
+
+/** Flatten a Lighthouse table cell to something displayable; nested/unknown shapes are dropped. */
+function cell(v: unknown): IssueCell | undefined {
+  if (v == null) return null
+  if (typeof v === 'string' || typeof v === 'number') return v
+  if (typeof v === 'boolean') return String(v)
+  if (typeof v === 'object') {
+    const o = v as Json
+    if (typeof o.value === 'number' || typeof o.value === 'string') return o.value
+    if (typeof o.nodeLabel === 'string') return o.nodeLabel
+    if (typeof o.snippet === 'string') return o.snippet
+    if (typeof o.url === 'string') return o.url
+    if (typeof o.text === 'string') return o.text
+  }
+  return undefined
+}
+
+function issueDetails(audit: Json): IssueDetails | null {
+  const d = audit?.details
+  if (!d || (d.type !== 'table' && d.type !== 'opportunity')) return null
+  const headings: IssueHeading[] = (d.headings ?? [])
+    .filter((h: Json) => h?.key)
+    .map((h: Json) => ({
+      key: String(h.key),
+      label: typeof h.label === 'string' ? h.label : String(h.key),
+      valueType: String(h.valueType ?? 'text'),
+    }))
+  if (!headings.length || !Array.isArray(d.items) || !d.items.length) return null
+  const items = d.items.slice(0, MAX_DETAIL_ROWS).map((it: Json) => {
+    const row: Record<string, IssueCell> = {}
+    for (const h of headings) {
+      const c = cell(it?.[h.key])
+      if (c !== undefined) row[h.key] = c
+    }
+    return row
+  })
+  return { headings, items }
+}
+
 export function parsePsiResponse(data: Json): PsiSample {
   const lhr = data.lighthouseResult ?? {}
   const exp = data.loadingExperience ?? {}
@@ -106,6 +162,8 @@ export function parsePsiResponse(data: Json): PsiSample {
         typeof a.details?.overallSavingsMs === 'number' ? a.details.overallSavingsMs : null,
       displayValue: (a.displayValue as string) ?? null,
       metricSavings: metricSavings(a),
+      description: typeof a.description === 'string' ? a.description : null,
+      details: issueDetails(a),
     }))
     .sort((a: Json, b: Json) => (b.savingsMs ?? 0) - (a.savingsMs ?? 0))
     .slice(0, 12)
