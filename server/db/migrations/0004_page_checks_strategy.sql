@@ -1,0 +1,1 @@
+ALTER TABLE `page_checks` ADD `strategy` text DEFAULT 'desktop' NOT NULL;

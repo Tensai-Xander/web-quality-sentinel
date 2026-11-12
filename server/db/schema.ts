@@ -94,6 +94,7 @@ export const pageChecks = sqliteTable(
       .references(() => runs.id, { onDelete: 'cascade' }),
     pageId: text('page_id').notNull(),
     url: text('url').notNull(),
+    strategy: text('strategy').notNull().default('desktop'), // mobile | desktop
     finalUrl: text('final_url'),
     status: text('status').notNull(), // ok | error
     error: text('error'),

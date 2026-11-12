@@ -7,7 +7,7 @@ timings (LCP, CLS, TBT, FCP, Speed Index, TTFB) of each configured page, on mobi
 Results are stored in a local SQLite database and shown in a dashboard with history, trends,
 run-to-run comparison and alerts. Each alert lists the Lighthouse issues that affect its metric,
 and each issue opens Lighthouse's explanation and per-URL breakdown (the same table PSI shows).
-Every run also visits each page once in a headless browser (Playwright) to catch what PSI does not
+Every run also visits each page in a headless browser (Playwright), on a mobile and a desktop viewport, to catch what PSI does not
 report: HTTP errors, JavaScript console errors, failed requests, broken same-site links, missing or
 oversized meta tags (title, description, canonical, Open Graph, `lang`, `h1`) and invalid JSON-LD. Several sites can be monitored from the same dashboard (site
 selector in the top bar); each site has its own page list and its own history.
@@ -113,7 +113,7 @@ It reads `robots.txt` (`Sitemap:` lines, falling back to `/sitemap.xml`), follow
 
 ## Quality checks (browser)
 
-After the PSI samples of a page, the runner opens it once in headless Chromium (`crawl` block of
+After the PSI samples of a page, the runner opens it in headless Chromium once per device (mobile viewport + mobile user agent, then desktop; links are checked on the first visit only) (`crawl` block of
 `sentinel.config.ts`: `enabled`, `maxLinks`, `timeoutMs`) and records:
 
 - the HTTP status of the page and every request that failed or returned ≥ 400,

@@ -29,6 +29,13 @@
       "when": 1794444452711,
       "tag": "0003_page_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794446081166,
+      "tag": "0004_page_checks_strategy",
+      "breakpoints": true
     }
   ]
 }

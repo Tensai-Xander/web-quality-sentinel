@@ -108,7 +108,9 @@ async function processRun(runId: number, site: SiteConfig, pageIds: string[]) {
         if (fatal) break
       }
       if (fatal) break
-      if (config.crawl.enabled) await runCrawl(runId, site, page)
+      if (config.crawl.enabled)
+        for (const [i, strategy] of config.strategies.entries())
+          await runCrawl(runId, site, page, strategy, i === 0)
     }
 
     db.update(schema.runs)
@@ -266,17 +268,23 @@ function evaluate(
 }
 
 /** Browser checks for one page; failures are stored, never fatal for the run. */
-async function runCrawl(runId: number, site: SiteConfig, page: PageConfig) {
+async function runCrawl(
+  runId: number,
+  site: SiteConfig,
+  page: PageConfig,
+  strategy: Strategy,
+  checkLinks: boolean
+) {
   const config = useSentinelConfig()
   const db = useDb()
   const url = pageUrl(site, page)
   let result: CrawlResult | null = null
   let error: string | null = null
   try {
-    result = await crawlPage(url, config.crawl)
+    result = await crawlPage(url, config.crawl, strategy, checkLinks)
   } catch (err) {
     error = String((err as Error).message ?? err).slice(0, 300)
-    console.warn(`[sentinel] crawl ${url} failed: ${error}`)
+    console.warn(`[sentinel] crawl ${strategy} ${url} failed: ${error}`)
   }
   const jsErrors = (result?.consoleErrors.length ?? 0) + (result?.pageErrors.length ?? 0)
   db.insert(schema.pageChecks)
@@ -284,6 +292,7 @@ async function runCrawl(runId: number, site: SiteConfig, page: PageConfig) {
       runId,
       pageId: page.id,
       url,
+      strategy,
       finalUrl: result?.finalUrl ?? null,
       status: result ? 'ok' : 'error',
       error,
@@ -347,7 +356,7 @@ async function runCrawl(runId: number, site: SiteConfig, page: PageConfig) {
         pageResultId: null,
         pageId: page.id,
         url,
-        strategy: 'page',
+        strategy,
         metric: f.metric,
         kind: 'quality',
         severity: f.severity,

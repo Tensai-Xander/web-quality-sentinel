@@ -212,6 +212,16 @@ function alreadyHas(site: ClientSite, path: string) {
             <td>{{ config.psi.samples }} per page × device, {{ config.psi.delayMs }} ms apart</td>
           </tr>
           <tr>
+            <th>Browser checks</th>
+            <td>
+              <template v-if="config.crawl.enabled">
+                Playwright on {{ config.strategies.join(' and ') }}: HTTP status, JavaScript errors,
+                broken links (up to {{ config.crawl.maxLinks }} per page), meta tags, JSON-LD
+              </template>
+              <span v-else class="pill">disabled</span>
+            </td>
+          </tr>
+          <tr>
             <th>PSI API key</th>
             <td>
               <span v-if="config.hasApiKey" class="pill completed">configured</span>

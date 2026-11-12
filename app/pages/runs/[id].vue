@@ -225,13 +225,15 @@ onUnmounted(() => clearInterval(timer))
       <section v-if="data.checks?.length" class="card">
         <h2>Quality checks</h2>
         <p class="muted small" style="margin: 0 0 0.5rem">
-          One browser visit per page (Playwright): HTTP status, JavaScript errors, broken same-site
-          links, meta tags and structured data. Click a row for details.
+          One browser visit per page and device (Playwright): HTTP status, JavaScript errors, broken
+          same-site links (checked once per page), meta tags and structured data. Click a row for
+          details.
         </p>
         <table>
           <thead>
             <tr>
               <th>Page</th>
+              <th>Device</th>
               <th class="num">HTTP</th>
               <th class="num">JS errors</th>
               <th class="num">Failed requests</th>
@@ -250,6 +252,7 @@ onUnmounted(() => clearInterval(timer))
                     {{ c.finalUrl && c.finalUrl !== c.url ? `${c.url} → ${c.finalUrl}` : c.url }}
                   </div>
                 </td>
+                <td>{{ c.strategy }}</td>
                 <template v-if="c.status === 'ok'">
                   <td class="num">
                     <span
@@ -288,7 +291,7 @@ onUnmounted(() => clearInterval(timer))
                 </td>
               </tr>
               <tr v-if="expandedCheck === c.id && c.details">
-                <td colspan="8" style="white-space: normal; background: #fafbfc">
+                <td colspan="9" style="white-space: normal; background: #fafbfc">
                   <div class="grid small">
                     <div>
                       <h3>Meta tags</h3>

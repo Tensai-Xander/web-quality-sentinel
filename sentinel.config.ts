@@ -34,7 +34,7 @@ const config: SentinelConfig = {
     minDelta: { lcp: 300, fcp: 300, tbt: 250, si: 500, ttfb: 200, cls: 0.03 },
   },
 
-  // Browser checks with Playwright, once per page and run (no quota, ~5-20 s per page):
+  // Browser checks with Playwright, once per page and device per run (no quota, ~3-10 s each):
   // HTTP status, JavaScript console errors, broken same-site links, meta tags, JSON-LD.
   crawl: {
     enabled: true,

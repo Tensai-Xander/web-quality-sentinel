@@ -1,10 +1,27 @@
 import { chromium, type Browser } from 'playwright'
 
+const UA_TAG = 'web-quality-sentinel/1.0 (+https://github.com/Tensai-Xander/web-quality-sentinel)'
+const UA_BASE = `Mozilla/5.0 (compatible; ${UA_TAG})`
+const UA = UA_BASE
+
 export interface CrawlOptions {
   /** Max same-site links checked per page. */
   maxLinks: number
   /** Page load timeout (ms). */
   timeoutMs: number
+}
+export type CrawlStrategy = 'mobile' | 'desktop'
+/** Viewports/user agents close to PSI's Lighthouse devices. */
+const DEVICES: Record<
+  CrawlStrategy,
+  { ua: string; viewport: { width: number; height: number }; isMobile: boolean }
+> = {
+  desktop: { ua: UA_BASE, viewport: { width: 1280, height: 900 }, isMobile: false },
+  mobile: {
+    ua: `Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1 ${UA_TAG}`,
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+  },
 }
 
 export interface BrokenLink {
@@ -38,6 +55,7 @@ export interface JsonLdInfo {
 }
 export interface CrawlResult {
   url: string
+  strategy: CrawlStrategy
   finalUrl: string
   httpStatus: number | null
   consoleErrors: string[]
@@ -51,8 +69,6 @@ export interface CrawlResult {
   durationMs: number
 }
 
-const UA =
-  'Mozilla/5.0 (compatible; web-quality-sentinel/1.0; +https://github.com/Tensai-Xander/web-quality-sentinel)'
 const LINK_TIMEOUT_MS = 12000
 const LINK_CONCURRENCY = 5
 
@@ -64,10 +80,22 @@ async function getBrowser() {
 }
 
 /** Browser visit of one page: HTTP status, JS errors, failed requests, links, meta tags, JSON-LD. */
-export async function crawlPage(url: string, opts: CrawlOptions): Promise<CrawlResult> {
+export async function crawlPage(
+  url: string,
+  opts: CrawlOptions,
+  strategy: CrawlStrategy = 'desktop',
+  checkLinksToo = true
+): Promise<CrawlResult> {
   const started = Date.now()
   const b = await getBrowser()
-  const context = await b.newContext({ userAgent: UA, viewport: { width: 1280, height: 900 } })
+  const dev = DEVICES[strategy]
+  const context = await b.newContext({
+    userAgent: dev.ua,
+    viewport: dev.viewport,
+    isMobile: dev.isMobile,
+    hasTouch: dev.isMobile,
+    deviceScaleFactor: dev.isMobile ? 3 : 1,
+  })
   const page = await context.newPage()
   const consoleErrors: string[] = []
   const pageErrors: string[] = []
@@ -126,10 +154,13 @@ export async function crawlPage(url: string, opts: CrawlOptions): Promise<CrawlR
 
     const meta = checkMeta(data, finalUrl)
     const jsonld = checkJsonLd(data.scripts)
-    const { total, checked, broken } = await checkLinks(data.links, origin, finalUrl, opts.maxLinks)
+    const { total, checked, broken } = checkLinksToo
+      ? await checkLinks(data.links, origin, finalUrl, opts.maxLinks)
+      : { total: 0, checked: 0, broken: [] }
 
     return {
       url,
+      strategy,
       finalUrl,
       httpStatus,
       consoleErrors: dedupe(consoleErrors),
