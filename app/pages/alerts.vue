@@ -6,7 +6,7 @@ const { data: alerts } = await useFetch<Alert[]>('/api/alerts', {
   query: { limit: 500, site: siteId },
   default: () => [],
 })
-const kind = ref<'all' | 'threshold' | 'regression'>('all')
+const kind = ref<'all' | 'threshold' | 'regression' | 'quality'>('all')
 const severity = ref<'all' | 'warn' | 'fail'>('all')
 const filtered = computed(() =>
   alerts.value.filter(
@@ -26,6 +26,7 @@ const filtered = computed(() =>
           <option value="all">All kinds</option>
           <option value="threshold">Threshold</option>
           <option value="regression">Regression</option>
+          <option value="quality">Quality (links, JS, meta, JSON-LD)</option>
         </select>
         <select v-model="severity">
           <option value="all">All severities</option>

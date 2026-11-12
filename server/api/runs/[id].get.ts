@@ -16,5 +16,11 @@ export default defineEventHandler((event) => {
     .all()
     .map((r) => ({ ...r, details: r.details ? JSON.parse(r.details) : null }))
   const alerts = db.select().from(schema.alerts).where(eq(schema.alerts.runId, id)).all()
-  return { run, results, alerts }
+  const checks = db
+    .select()
+    .from(schema.pageChecks)
+    .where(eq(schema.pageChecks.runId, id))
+    .all()
+    .map((c) => ({ ...c, details: c.details ? JSON.parse(c.details) : null }))
+  return { run, results, alerts, checks }
 })

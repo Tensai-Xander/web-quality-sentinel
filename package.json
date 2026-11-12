@@ -20,6 +20,7 @@
     "chart.js": "^4.6.1",
     "drizzle-orm": "^0.45.4",
     "nuxt": "^4.6.3",
+    "playwright": "^1.65.0",
     "vue": "^3.5.44",
     "vue-chartjs": "^5.3.4",
     "vue-router": "^5.4.0"

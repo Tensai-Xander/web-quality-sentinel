@@ -4,6 +4,7 @@ import { useDb, schema } from '../db'
 import type { PsiError, PsiSample } from './psi'
 import { checkRegressions, checkThresholds, type Finding, type MetricValues } from './regression'
 import { getSite, pageUrl, thresholdsFor, useSentinelConfig } from './sentinelConfig'
+import { crawlPage, type CrawlResult } from './crawler'
 
 let activeRun: { id: number; siteId: string } | null = null
 
@@ -107,6 +108,7 @@ async function processRun(runId: number, site: SiteConfig, pageIds: string[]) {
         if (fatal) break
       }
       if (fatal) break
+      if (config.crawl.enabled) await runCrawl(runId, site, page)
     }
 
     db.update(schema.runs)
@@ -256,6 +258,102 @@ function evaluate(
         actual: f.actual,
         limit: f.limit,
         baseline: f.baseline,
+        message: f.message,
+        createdAt: new Date().toISOString(),
+      }))
+    )
+    .run()
+}
+
+/** Browser checks for one page; failures are stored, never fatal for the run. */
+async function runCrawl(runId: number, site: SiteConfig, page: PageConfig) {
+  const config = useSentinelConfig()
+  const db = useDb()
+  const url = pageUrl(site, page)
+  let result: CrawlResult | null = null
+  let error: string | null = null
+  try {
+    result = await crawlPage(url, config.crawl)
+  } catch (err) {
+    error = String((err as Error).message ?? err).slice(0, 300)
+    console.warn(`[sentinel] crawl ${url} failed: ${error}`)
+  }
+  const jsErrors = (result?.consoleErrors.length ?? 0) + (result?.pageErrors.length ?? 0)
+  db.insert(schema.pageChecks)
+    .values({
+      runId,
+      pageId: page.id,
+      url,
+      finalUrl: result?.finalUrl ?? null,
+      status: result ? 'ok' : 'error',
+      error,
+      httpStatus: result?.httpStatus ?? null,
+      jsErrors,
+      failedRequests: result?.failedRequests.length ?? 0,
+      linksChecked: result?.linksChecked ?? 0,
+      brokenLinks: result?.brokenLinks.length ?? 0,
+      metaIssues: result?.meta.issues.length ?? 0,
+      jsonldCount: result?.jsonld.count ?? 0,
+      jsonldIssues: result?.jsonld.issues.length ?? 0,
+      durationMs: result?.durationMs ?? null,
+      details: result ? JSON.stringify(result) : null,
+      createdAt: new Date().toISOString(),
+    })
+    .run()
+  if (!result) return
+
+  const findings: { metric: string; severity: 'warn' | 'fail'; actual: number; message: string }[] =
+    []
+  if (result.httpStatus == null || result.httpStatus >= 400)
+    findings.push({
+      metric: 'http',
+      severity: 'fail',
+      actual: result.httpStatus ?? 0,
+      message: `Page returned HTTP ${result.httpStatus ?? 'error'}`,
+    })
+  if (result.brokenLinks.length)
+    findings.push({
+      metric: 'brokenLinks',
+      severity: 'fail',
+      actual: result.brokenLinks.length,
+      message: `${result.brokenLinks.length} broken link(s) out of ${result.linksChecked} checked`,
+    })
+  if (jsErrors)
+    findings.push({
+      metric: 'jsErrors',
+      severity: 'warn',
+      actual: jsErrors,
+      message: `${jsErrors} JavaScript error(s) in the console`,
+    })
+  if (result.meta.issues.length)
+    findings.push({
+      metric: 'meta',
+      severity: 'warn',
+      actual: result.meta.issues.length,
+      message: `Meta tags: ${result.meta.issues.join('; ')}`,
+    })
+  if (result.jsonld.issues.length)
+    findings.push({
+      metric: 'jsonld',
+      severity: 'warn',
+      actual: result.jsonld.issues.length,
+      message: `Structured data: ${result.jsonld.issues.join('; ')}`,
+    })
+  if (!findings.length) return
+  db.insert(schema.alerts)
+    .values(
+      findings.map((f) => ({
+        runId,
+        pageResultId: null,
+        pageId: page.id,
+        url,
+        strategy: 'page',
+        metric: f.metric,
+        kind: 'quality',
+        severity: f.severity,
+        actual: f.actual,
+        limit: null,
+        baseline: null,
         message: f.message,
         createdAt: new Date().toISOString(),
       }))

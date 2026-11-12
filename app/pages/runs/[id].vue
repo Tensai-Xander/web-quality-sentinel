@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { Run, PageResult, Alert } from '~~/server/db/schema'
+import type { Run, PageResult, Alert, PageCheck } from '~~/server/db/schema'
+import type { CrawlResult } from '~~/server/utils/crawler'
 import type { Opportunity } from '~~/server/utils/psi'
 import { SCORE_METRICS, TIMING_METRICS, METRIC_LABELS, type Metric } from '~~/shared/types/sentinel'
 import { formatDate, formatDuration, formatMetric } from '~~/shared/utils/format'
@@ -13,7 +14,9 @@ interface RunDetail {
   run: Run
   results: (Omit<PageResult, 'details'> & { details: Details | null })[]
   alerts: Alert[]
+  checks: (Omit<PageCheck, 'details'> & { details: CrawlResult | null })[]
 }
+const expandedCheck = ref<number | null>(null)
 
 const route = useRoute()
 const id = Number(route.params.id)
@@ -212,6 +215,178 @@ onUnmounted(() => clearInterval(timer))
                       :details="o.details"
                     />
                   </template>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </section>
+
+      <section v-if="data.checks?.length" class="card">
+        <h2>Quality checks</h2>
+        <p class="muted small" style="margin: 0 0 0.5rem">
+          One browser visit per page (Playwright): HTTP status, JavaScript errors, broken same-site
+          links, meta tags and structured data. Click a row for details.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Page</th>
+              <th class="num">HTTP</th>
+              <th class="num">JS errors</th>
+              <th class="num">Failed requests</th>
+              <th class="num">Broken links</th>
+              <th class="num">Meta issues</th>
+              <th class="num">JSON-LD</th>
+              <th class="num">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="c in data.checks" :key="c.id">
+              <tr class="clickable" @click="expandedCheck = expandedCheck === c.id ? null : c.id">
+                <td>
+                  <strong>{{ pageLabel(c.pageId, data.run.siteId) }}</strong>
+                  <div class="muted small">
+                    {{ c.finalUrl && c.finalUrl !== c.url ? `${c.url} → ${c.finalUrl}` : c.url }}
+                  </div>
+                </td>
+                <template v-if="c.status === 'ok'">
+                  <td class="num">
+                    <span
+                      class="pill"
+                      :class="(c.httpStatus ?? 500) >= 400 ? 'fail' : 'completed'"
+                      >{{ c.httpStatus ?? '–' }}</span
+                    >
+                  </td>
+                  <td class="num" :style="c.jsErrors ? 'color: var(--average)' : ''">
+                    {{ c.jsErrors }}
+                  </td>
+                  <td class="num" :style="c.failedRequests ? 'color: var(--average)' : ''">
+                    {{ c.failedRequests }}
+                  </td>
+                  <td class="num" :style="c.brokenLinks ? 'color: var(--poor)' : ''">
+                    {{ c.brokenLinks }} / {{ c.linksChecked }}
+                  </td>
+                  <td class="num" :style="c.metaIssues ? 'color: var(--average)' : ''">
+                    {{ c.metaIssues }}
+                  </td>
+                  <td class="num" :style="c.jsonldIssues ? 'color: var(--average)' : ''">
+                    {{ c.jsonldCount
+                    }}<template v-if="c.jsonldIssues"> ({{ c.jsonldIssues }} issues)</template>
+                  </td>
+                  <td class="num muted">
+                    {{ c.durationMs ? `${(c.durationMs / 1000).toFixed(1)} s` : '–' }}
+                  </td>
+                </template>
+                <td
+                  v-else
+                  colspan="7"
+                  class="small"
+                  style="color: var(--poor); white-space: normal"
+                >
+                  {{ c.error }}
+                </td>
+              </tr>
+              <tr v-if="expandedCheck === c.id && c.details">
+                <td colspan="8" style="white-space: normal; background: #fafbfc">
+                  <div class="grid small">
+                    <div>
+                      <h3>Meta tags</h3>
+                      <ul
+                        v-if="c.details.meta.issues.length"
+                        style="margin: 0 0 0.4rem; padding-left: 1.1rem; color: var(--average)"
+                      >
+                        <li v-for="i in c.details.meta.issues" :key="i">{{ i }}</li>
+                      </ul>
+                      <div v-else class="muted">No issue.</div>
+                      <table class="small">
+                        <tbody>
+                          <tr
+                            v-for="k in [
+                              'title',
+                              'description',
+                              'canonical',
+                              'robots',
+                              'lang',
+                              'ogTitle',
+                              'ogDescription',
+                              'ogImage',
+                            ] as const"
+                            :key="k"
+                          >
+                            <th>{{ k }}</th>
+                            <td style="white-space: normal">{{ c.details.meta[k] ?? '–' }}</td>
+                          </tr>
+                          <tr>
+                            <th>h1</th>
+                            <td>{{ c.details.meta.h1Count }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <div>
+                      <h3>Structured data (JSON-LD)</h3>
+                      <div>
+                        {{ c.details.jsonld.count }} block(s)<template
+                          v-if="c.details.jsonld.types.length"
+                          >: {{ c.details.jsonld.types.join(', ') }}</template
+                        >
+                      </div>
+                      <ul
+                        v-if="c.details.jsonld.issues.length"
+                        style="margin: 0.3rem 0 0; padding-left: 1.1rem; color: var(--average)"
+                      >
+                        <li v-for="i in c.details.jsonld.issues" :key="i">{{ i }}</li>
+                      </ul>
+                      <h3 style="margin-top: 0.8rem">JavaScript errors</h3>
+                      <ul
+                        v-if="c.details.pageErrors.length || c.details.consoleErrors.length"
+                        style="margin: 0; padding-left: 1.1rem"
+                      >
+                        <li
+                          v-for="e in [...c.details.pageErrors, ...c.details.consoleErrors]"
+                          :key="e"
+                        >
+                          <code>{{ e }}</code>
+                        </li>
+                      </ul>
+                      <div v-else class="muted">None.</div>
+                    </div>
+                    <div>
+                      <h3>
+                        Broken links ({{ c.details.brokenLinks.length }} of
+                        {{ c.details.linksChecked }} checked)
+                      </h3>
+                      <ul
+                        v-if="c.details.brokenLinks.length"
+                        style="margin: 0; padding-left: 1.1rem"
+                      >
+                        <li v-for="l in c.details.brokenLinks" :key="l.url">
+                          <a :href="l.url" target="_blank" rel="noopener" @click.stop>{{
+                            l.url
+                          }}</a>
+                          <span class="pill fail" style="margin-left: 0.3em">{{
+                            l.status ?? l.error
+                          }}</span>
+                          <span v-if="l.text" class="muted"> — "{{ l.text }}"</span>
+                        </li>
+                      </ul>
+                      <div v-else class="muted">None.</div>
+                      <h3 style="margin-top: 0.8rem">
+                        Failed requests ({{ c.details.failedRequests.length }})
+                      </h3>
+                      <ul
+                        v-if="c.details.failedRequests.length"
+                        style="margin: 0; padding-left: 1.1rem"
+                      >
+                        <li v-for="f in c.details.failedRequests" :key="f.url">
+                          <code>{{ f.url }}</code>
+                          <span class="pill warn">{{ f.status ?? f.error }}</span>
+                        </li>
+                      </ul>
+                      <div v-else class="muted">None.</div>
+                    </div>
+                  </div>
                 </td>
               </tr>
             </template>

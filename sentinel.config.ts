@@ -33,6 +33,14 @@ const config: SentinelConfig = {
     timingIncreasePct: 50,
     minDelta: { lcp: 300, fcp: 300, tbt: 250, si: 500, ttfb: 200, cls: 0.03 },
   },
+
+  // Browser checks with Playwright, once per page and run (no quota, ~5-20 s per page):
+  // HTTP status, JavaScript console errors, broken same-site links, meta tags, JSON-LD.
+  crawl: {
+    enabled: true,
+    maxLinks: 60,
+    timeoutMs: 30000,
+  },
 }
 
 export default config

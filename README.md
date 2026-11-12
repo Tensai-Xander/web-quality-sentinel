@@ -6,7 +6,10 @@ Monitors the quality of one or several websites over time and flags regressions.
 timings (LCP, CLS, TBT, FCP, Speed Index, TTFB) of each configured page, on mobile and desktop.
 Results are stored in a local SQLite database and shown in a dashboard with history, trends,
 run-to-run comparison and alerts. Each alert lists the Lighthouse issues that affect its metric,
-and each issue opens Lighthouse's explanation and per-URL breakdown (the same table PSI shows). Several sites can be monitored from the same dashboard (site
+and each issue opens Lighthouse's explanation and per-URL breakdown (the same table PSI shows).
+Every run also visits each page once in a headless browser (Playwright) to catch what PSI does not
+report: HTTP errors, JavaScript console errors, failed requests, broken same-site links, missing or
+oversized meta tags (title, description, canonical, Open Graph, `lang`, `h1`) and invalid JSON-LD. Several sites can be monitored from the same dashboard (site
 selector in the top bar); each site has its own page list and its own history.
 
 Everything runs locally in a single Node process — no Docker, no external database, only free
@@ -35,6 +38,7 @@ The whole procedure for a new team or a new website takes about 10 minutes.
 git clone https://github.com/Tensai-Xander/web-quality-sentinel.git
 cd web-quality-sentinel
 pnpm install
+pnpm exec playwright install chromium   # headless browser for the quality checks (~130 MB, once)
 cp .env.example .env         # then put your key in NUXT_PSI_API_KEY=
 ```
 
@@ -107,6 +111,23 @@ pnpm sentinel:init https://www.example.com
 
 It reads `robots.txt` (`Sitemap:` lines, falling back to `/sitemap.xml`), follows sitemap indexes and keeps one representative URL per page _template_: `/blog/post-a`, `/blog/post-b`, … become a single `/blog/*` entry (numeric/UUID segments, and segments with more than 3 distinct values under the same parent, are treated as parameters; top-level sections are always kept). It appends the site (id derived from the host name, e.g. `kinto-mobility`) to `sentinel.sites.json`. If a site with that id already exists it only prints the snippet; `--force` replaces the existing entry (its history is kept, as it is linked to the site id). Review the result: delete pages behind a login or of no interest, and rename ids/labels as you like.
 
+## Quality checks (browser)
+
+After the PSI samples of a page, the runner opens it once in headless Chromium (`crawl` block of
+`sentinel.config.ts`: `enabled`, `maxLinks`, `timeoutMs`) and records:
+
+- the HTTP status of the page and every request that failed or returned ≥ 400,
+- JavaScript errors (`pageerror` and `console.error`),
+- the status of up to `maxLinks` distinct same-site links found on the page (HEAD, then GET),
+- meta tags: title / description presence and length, canonical, `<html lang>`, Open Graph
+  title/description/image, number of `<h1>`,
+- JSON-LD blocks: valid JSON, `@type` and `@context` present, detected types.
+
+Each finding raises a _quality_ alert (`fail` for HTTP errors and broken links, `warn` otherwise)
+and the details are shown in the run page under "Quality checks". `pnpm install` downloads
+Playwright; the browser itself is fetched on first install with `pnpm exec playwright install chromium`
+(see Install).
+
 ## How regressions are detected
 
 1. **Noise reduction** – each page × device is measured `psi.samples` times (default 3) and the
@@ -177,6 +198,7 @@ server/db/              Drizzle schema + SQL migrations (applied automatically a
 server/utils/psi.ts     PageSpeed Insights client and median aggregation
 server/utils/regression.ts  threshold and baseline/regression rules
 server/utils/runner.ts  run orchestration (one run at a time, progress, error handling)
+server/utils/crawler.ts Playwright visit: HTTP/JS errors, broken links, meta tags, JSON-LD
 server/api/             JSON API used by the dashboard and by CI
 app/                    Nuxt dashboard: overview, run detail, trends, compare, alerts, settings
 scripts/init-config.mjs add a site from its sitemap (CLI twin of Settings → Add a site)

@@ -37,7 +37,9 @@ function resultFor(detail: RunDetail | null, pageId: string) {
 }
 function alertsFor(pageId: string) {
   return (
-    latest.value?.alerts.filter((a) => a.pageId === pageId && a.strategy === strategy.value) ?? []
+    latest.value?.alerts.filter(
+      (a) => a.pageId === pageId && (a.strategy === strategy.value || a.strategy === 'page')
+    ) ?? []
   )
 }
 

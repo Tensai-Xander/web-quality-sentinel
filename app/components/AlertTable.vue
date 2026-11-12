@@ -2,7 +2,7 @@
 import type { Alert } from '~~/server/db/schema'
 import type { IssueDetails } from '~~/server/utils/psi'
 import { formatMetric, formatDate } from '~~/shared/utils/format'
-import { METRIC_LABELS } from '~~/shared/types/sentinel'
+import { METRIC_LABELS, QUALITY_LABELS } from '~~/shared/types/sentinel'
 
 export interface AlertIssue {
   id: string
@@ -52,11 +52,23 @@ const toggle = (key: string) => (openIssue.value = openIssue.value === key ? nul
         </td>
         <td>{{ a.kind }}</td>
         <td :title="a.url">{{ pageLabel(a.pageId, siteId) }}</td>
-        <td>{{ a.strategy }}</td>
-        <td>{{ METRIC_LABELS[a.metric as keyof typeof METRIC_LABELS] ?? a.metric }}</td>
-        <td class="num">{{ formatMetric(a.metric, a.actual) }}</td>
+        <td>{{ a.strategy === 'page' ? '–' : a.strategy }}</td>
+        <td>
+          {{
+            METRIC_LABELS[a.metric as keyof typeof METRIC_LABELS] ??
+            QUALITY_LABELS[a.metric as keyof typeof QUALITY_LABELS] ??
+            a.metric
+          }}
+        </td>
         <td class="num">
-          {{ formatMetric(a.metric, a.kind === 'threshold' ? a.limit : a.baseline) }}
+          {{ a.kind === 'quality' ? a.actual : formatMetric(a.metric, a.actual) }}
+        </td>
+        <td class="num">
+          {{
+            a.kind === 'quality'
+              ? '–'
+              : formatMetric(a.metric, a.kind === 'threshold' ? a.limit : a.baseline)
+          }}
         </td>
         <td style="white-space: normal">
           {{ a.message }}

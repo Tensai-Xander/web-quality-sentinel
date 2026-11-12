@@ -86,9 +86,26 @@ export interface SentinelConfig {
   }
   thresholds: Thresholds
   regression: RegressionRules
+  /** Browser checks (Playwright): broken links, JS errors, meta tags, JSON-LD. */
+  crawl: {
+    enabled: boolean
+    /** Max same-site links checked per page. */
+    maxLinks: number
+    /** Page load timeout (ms). */
+    timeoutMs: number
+  }
 }
 
 export type RunTrigger = 'manual' | 'release'
 export type RunStatus = 'running' | 'completed' | 'failed'
-export type AlertKind = 'threshold' | 'regression'
+export type AlertKind = 'threshold' | 'regression' | 'quality'
+/** Metrics of quality (crawler) alerts. */
+export type QualityMetric = 'http' | 'jsErrors' | 'brokenLinks' | 'meta' | 'jsonld'
+export const QUALITY_LABELS: Record<QualityMetric, string> = {
+  http: 'HTTP status',
+  jsErrors: 'JavaScript errors',
+  brokenLinks: 'Broken links',
+  meta: 'Meta tags',
+  jsonld: 'Structured data',
+}
 export type AlertSeverity = 'warn' | 'fail'

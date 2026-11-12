@@ -84,6 +84,36 @@ export const alerts = sqliteTable(
   (t) => [index('alerts_run_idx').on(t.runId)]
 )
 
+/** One browser visit per page and run (Playwright): errors, links, meta, JSON-LD. */
+export const pageChecks = sqliteTable(
+  'page_checks',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    runId: integer('run_id')
+      .notNull()
+      .references(() => runs.id, { onDelete: 'cascade' }),
+    pageId: text('page_id').notNull(),
+    url: text('url').notNull(),
+    finalUrl: text('final_url'),
+    status: text('status').notNull(), // ok | error
+    error: text('error'),
+    httpStatus: integer('http_status'),
+    jsErrors: integer('js_errors').notNull().default(0),
+    failedRequests: integer('failed_requests').notNull().default(0),
+    linksChecked: integer('links_checked').notNull().default(0),
+    brokenLinks: integer('broken_links').notNull().default(0),
+    metaIssues: integer('meta_issues').notNull().default(0),
+    jsonldCount: integer('jsonld_count').notNull().default(0),
+    jsonldIssues: integer('jsonld_issues').notNull().default(0),
+    durationMs: integer('duration_ms'),
+    // JSON: CrawlResult (error messages, broken link list, meta values, JSON-LD types)
+    details: text('details'),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [index('page_checks_run_idx').on(t.runId)]
+)
+
 export type Run = typeof runs.$inferSelect
+export type PageCheck = typeof pageChecks.$inferSelect
 export type PageResult = typeof pageResults.$inferSelect
 export type Alert = typeof alerts.$inferSelect
