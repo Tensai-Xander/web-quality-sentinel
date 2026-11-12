@@ -23,21 +23,31 @@ const previousCompletedId = computed(
 
 const { data: latest, refresh: refreshLatest } = await useFetch<RunDetail | null>(
   () => (latestId.value ? `/api/runs/${latestId.value}` : ''),
-  { immediate: !!latestId.value, default: () => null, watch: [latestId] }
+  {
+    immediate: !!latestId.value,
+    default: () => null,
+    watch: [latestId],
+    transform: (d) => (d && typeof d === 'object' && 'run' in d ? d : null),
+  }
 )
 const { data: previous } = await useFetch<RunDetail | null>(
   () => (previousCompletedId.value ? `/api/runs/${previousCompletedId.value}` : ''),
-  { immediate: !!previousCompletedId.value, default: () => null, watch: [previousCompletedId] }
+  {
+    immediate: !!previousCompletedId.value,
+    default: () => null,
+    watch: [previousCompletedId],
+    transform: (d) => (d && typeof d === 'object' && 'run' in d ? d : null),
+  }
 )
 
 const strategy = ref<'mobile' | 'desktop'>('mobile')
 
 function resultFor(detail: RunDetail | null, pageId: string) {
-  return detail?.results.find((r) => r.pageId === pageId && r.strategy === strategy.value)
+  return detail?.results?.find((r) => r.pageId === pageId && r.strategy === strategy.value)
 }
 function alertsFor(pageId: string) {
   return (
-    latest.value?.alerts.filter(
+    latest.value?.alerts?.filter(
       (a) => a.pageId === pageId && (a.strategy === strategy.value || a.strategy === 'page')
     ) ?? []
   )
@@ -66,7 +76,7 @@ onUnmounted(() => clearInterval(timer))
       </p>
     </div>
 
-    <template v-else-if="latest">
+    <template v-else-if="latest?.run">
       <section class="card">
         <div class="card-header">
           <div>
@@ -81,7 +91,7 @@ onUnmounted(() => clearInterval(timer))
               >
               · {{ formatDate(latest.run.startedAt) }} ·
               {{ formatDuration(latest.run.startedAt, latest.run.finishedAt) }}
-              <template v-if="previous"> · compared with #{{ previous.run.id }}</template>
+              <template v-if="previous?.run"> · compared with #{{ previous.run.id }}</template>
             </div>
             <div v-if="latest.run.error" class="small" style="color: var(--poor)">
               {{ latest.run.error }}
