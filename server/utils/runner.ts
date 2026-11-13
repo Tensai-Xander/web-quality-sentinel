@@ -159,8 +159,9 @@ function storeResult(
       noindex: agg?.noindex ?? false,
       details: agg
         ? JSON.stringify({
-            samples: samples.map(({ opportunities: _o, ...s }) => s),
+            samples: samples.map(({ opportunities: _o, field: _f, ...s }) => s),
             opportunities: samples[0]?.opportunities ?? [],
+            field: agg?.field ?? null,
           })
         : null,
       createdAt: new Date().toISOString(),
@@ -304,6 +305,8 @@ async function runCrawl(
       metaIssues: result?.meta.issues.length ?? 0,
       jsonldCount: result?.jsonld.count ?? 0,
       jsonldIssues: result?.jsonld.issues.length ?? 0,
+      a11yIssues: result?.a11y.violations.length ?? 0,
+      a11yElements: result?.a11y.elements ?? 0,
       durationMs: result?.durationMs ?? null,
       details: result ? JSON.stringify(result) : null,
       createdAt: new Date().toISOString(),
@@ -348,6 +351,19 @@ async function runCrawl(
       actual: result.jsonld.issues.length,
       message: `Structured data: ${result.jsonld.issues.join('; ')}`,
     })
+  if (result.a11y.violations.length) {
+    const v = result.a11y.violations
+    const top = v
+      .slice(0, 3)
+      .map((x) => `${x.id} (${x.impact} ×${x.nodes})`)
+      .join(', ')
+    findings.push({
+      metric: 'a11y',
+      severity: v.some((x) => x.impact === 'critical' || x.impact === 'serious') ? 'fail' : 'warn',
+      actual: v.length,
+      message: `Accessibility: ${v.length} rule(s) failed on ${result.a11y.elements} element(s) — ${top}${v.length > 3 ? ', …' : ''}`,
+    })
+  }
   if (!findings.length) return
   db.insert(schema.alerts)
     .values(

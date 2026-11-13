@@ -12,6 +12,10 @@ export default defineNuxtConfig({
   vite: {
     optimizeDeps: { include: ['chart.js', 'vue-chartjs'] },
   },
+  nitro: {
+    // the crawler reads this file at runtime (see server/utils/crawler.ts)
+    externals: { traceInclude: ['node_modules/axe-core/axe.min.js'] },
+  },
   app: {
     head: {
       title: 'Web Quality Sentinel',

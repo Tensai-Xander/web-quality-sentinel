@@ -35,7 +35,8 @@ const config: SentinelConfig = {
   },
 
   // Browser checks with Playwright, once per page and device per run (no quota, ~3-10 s each):
-  // HTTP status, JavaScript console errors, broken same-site links, meta tags, JSON-LD.
+  // HTTP status, JavaScript console errors, broken same-site links, meta tags, JSON-LD and an
+  // axe-core accessibility audit (WCAG 2.x A/AA + best practices).
   crawl: {
     enabled: true,
     maxLinks: 60,

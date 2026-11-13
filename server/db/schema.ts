@@ -41,7 +41,7 @@ export const pageResults = sqliteTable(
     fcp: real('fcp'),
     si: real('si'),
     ttfb: real('ttfb'),
-    // Field data (CrUX) when Google has enough traffic for the URL/origin
+    // Field data (CrUX p75) for this exact URL when Google has enough traffic; cls unitless
     fieldInp: real('field_inp'),
     fieldLcp: real('field_lcp'),
     fieldCls: real('field_cls'),
@@ -49,7 +49,7 @@ export const pageResults = sqliteTable(
     lighthouseVersion: text('lighthouse_version'),
     // Page is not indexable (noindex / robots): SEO score is informational only
     noindex: integer('noindex', { mode: 'boolean' }).notNull().default(false),
-    // JSON: per-sample scores/timings + top opportunities, for drill-down
+    // JSON: per-sample scores/timings, top opportunities, CrUX field data with ratings
     details: text('details'),
     createdAt: text('created_at').notNull(),
   },
@@ -84,7 +84,7 @@ export const alerts = sqliteTable(
   (t) => [index('alerts_run_idx').on(t.runId)]
 )
 
-/** One browser visit per page and run (Playwright): errors, links, meta, JSON-LD. */
+/** One browser visit per page, device and run (Playwright): errors, links, meta, JSON-LD, axe-core. */
 export const pageChecks = sqliteTable(
   'page_checks',
   {
@@ -106,8 +106,11 @@ export const pageChecks = sqliteTable(
     metaIssues: integer('meta_issues').notNull().default(0),
     jsonldCount: integer('jsonld_count').notNull().default(0),
     jsonldIssues: integer('jsonld_issues').notNull().default(0),
+    // axe-core: failed rules / affected elements
+    a11yIssues: integer('a11y_issues').notNull().default(0),
+    a11yElements: integer('a11y_elements').notNull().default(0),
     durationMs: integer('duration_ms'),
-    // JSON: CrawlResult (error messages, broken link list, meta values, JSON-LD types)
+    // JSON: CrawlResult (error messages, broken link list, meta values, JSON-LD types, axe violations)
     details: text('details'),
     createdAt: text('created_at').notNull(),
   },

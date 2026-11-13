@@ -36,6 +36,13 @@
       "when": 1794446081166,
       "tag": "0004_page_checks_strategy",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1794558908013,
+      "tag": "0005_a11y",
+      "breakpoints": true
     }
   ]
 }

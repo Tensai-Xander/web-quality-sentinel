@@ -7,9 +7,12 @@ timings (LCP, CLS, TBT, FCP, Speed Index, TTFB) of each configured page, on mobi
 Results are stored in a local SQLite database and shown in a dashboard with history, trends,
 run-to-run comparison and alerts. Each alert lists the Lighthouse issues that affect its metric,
 and each issue opens Lighthouse's explanation and per-URL breakdown (the same table PSI shows).
+The same PSI answer also carries Google's real-user data (Chrome UX Report) for the exact URL, shown
+per page as "Real users" (LCP / INP / CLS / FCP / TTFB with Google's rating, or "No data").
 Every run also visits each page in a headless browser (Playwright), on a mobile and a desktop viewport, to catch what PSI does not
 report: HTTP errors, JavaScript console errors, failed requests, broken same-site links, missing or
-oversized meta tags (title, description, canonical, Open Graph, `lang`, `h1`) and invalid JSON-LD. Several sites can be monitored from the same dashboard (site
+oversized meta tags (title, description, canonical, Open Graph, `lang`, `h1`), invalid JSON-LD and
+accessibility violations (axe-core, with the affected elements). Several sites can be monitored from the same dashboard (site
 selector in the top bar); each site has its own page list and its own history.
 
 Everything runs locally in a single Node process — no Docker, no external database, only free
@@ -121,12 +124,29 @@ After the PSI samples of a page, the runner opens it in headless Chromium once p
 - the status of up to `maxLinks` distinct same-site links found on the page (HEAD, then GET),
 - meta tags: title / description presence and length, canonical, `<html lang>`, Open Graph
   title/description/image, number of `<h1>`,
-- JSON-LD blocks: valid JSON, `@type` and `@context` present, detected types.
+- JSON-LD blocks: valid JSON, `@type` and `@context` present, detected types,
+- accessibility: an [axe-core](https://github.com/dequelabs/axe-core) audit of the rendered page
+  (WCAG 2.x A/AA rules + axe best practices). Each failed rule is stored with its impact
+  (critical / serious / moderate / minor), WCAG tags, help link, number of affected elements and
+  the first 5 elements (selector + HTML). Lighthouse's accessibility _score_ comes from PSI; this
+  audit gives the list of concrete problems behind it, on the real mobile and desktop rendering.
 
-Each finding raises a _quality_ alert (`fail` for HTTP errors and broken links, `warn` otherwise)
-and the details are shown in the run page under "Quality checks". `pnpm install` downloads
+Each finding raises a _quality_ alert (`fail` for HTTP errors, broken links and critical/serious
+accessibility violations, `warn` otherwise) and the details are shown in the run page under
+"Quality checks". `pnpm install` downloads
 Playwright; the browser itself is fetched on first install with `pnpm exec playwright install chromium`
 (see Install).
+
+## Real users (CrUX field data)
+
+Lab scores come from one simulated load on Google's servers. The PSI answer also contains the
+**Chrome UX Report** for the exact URL: how real Chrome visitors experienced the page over the last
+28 days (75th percentile of LCP, INP, CLS, FCP and TTFB, each rated good / needs improvement /
+poor with Google's fixed limits). The run page shows it per page and device under "Real users".
+Only the "This URL" data is used — when a page has too few Chrome visitors PSI falls back to
+origin-wide data, which is ignored and shown as "No data" (small or internal sites usually have
+none). Field data moves slowly (28-day window) and never raises alerts; it answers "are real
+users OK?", while the lab metrics answer "did the last release change something?".
 
 ## How regressions are detected
 
@@ -195,10 +215,10 @@ sentinel.sites.json     sites and their pages (edited from Settings / sentinel:i
 sentinel.config.ts      thresholds, regression rules, PSI options
 shared/                 types and formatting helpers shared by server and UI
 server/db/              Drizzle schema + SQL migrations (applied automatically at startup)
-server/utils/psi.ts     PageSpeed Insights client and median aggregation
+server/utils/psi.ts     PageSpeed Insights client, CrUX field data, median aggregation
 server/utils/regression.ts  threshold and baseline/regression rules
 server/utils/runner.ts  run orchestration (one run at a time, progress, error handling)
-server/utils/crawler.ts Playwright visit: HTTP/JS errors, broken links, meta tags, JSON-LD
+server/utils/crawler.ts Playwright visit: HTTP/JS errors, broken links, meta tags, JSON-LD, axe-core
 server/api/             JSON API used by the dashboard and by CI
 app/                    Nuxt dashboard: overview, run detail, trends, compare, alerts, settings
 scripts/init-config.mjs add a site from its sitemap (CLI twin of Settings → Add a site)
@@ -208,8 +228,6 @@ scripts/mock-psi.mjs    fake PSI endpoint for development
 
 ## Roadmap
 
-- Playwright crawler: broken links, HTTP errors, JavaScript console errors, meta/Open Graph tags,
-  JSON-LD validation
 - Slack notifications when a run produces `fail` alerts
 - GitHub Actions step that calls `POST /api/runs` after each deployment
-- CrUX field data trends, screenshot diffs
+- Screenshot diffs between runs, field data trends

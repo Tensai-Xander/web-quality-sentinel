@@ -27,6 +27,20 @@ export interface Opportunity {
   details: IssueDetails | null
 }
 
+/** Google's CrUX rating of a field metric (FAST / AVERAGE / SLOW). */
+export type FieldRating = 'good' | 'average' | 'poor'
+export type FieldMetric = 'lcp' | 'inp' | 'cls' | 'fcp' | 'ttfb'
+export interface FieldValue {
+  /** 75th percentile over the last 28 days; ms except cls (unitless). */
+  p75: number
+  rating: FieldRating
+}
+/** Real-user data (Chrome UX Report) for this exact URL; null when Google has no data for it. */
+export interface FieldData {
+  overall: FieldRating | null
+  metrics: Partial<Record<FieldMetric, FieldValue>>
+}
+
 export interface PsiSample {
   fetchTime: string
   lighthouseVersion: string
@@ -45,15 +59,17 @@ export interface PsiSample {
   fieldInp: number | null
   fieldLcp: number | null
   fieldCls: number | null
+  field: FieldData | null
   /** Failed performance audits with potential savings, biggest first. */
   opportunities: Opportunity[]
 }
 
 export interface PsiAggregate {
   samples: PsiSample[]
-  median: Omit<PsiSample, 'fetchTime' | 'lighthouseVersion' | 'opportunities' | 'noindex'>
+  median: Omit<PsiSample, 'fetchTime' | 'lighthouseVersion' | 'opportunities' | 'noindex' | 'field'>
   lighthouseVersion: string
   noindex: boolean
+  field: FieldData | null
 }
 
 export class PsiError extends Error {
@@ -78,9 +94,31 @@ function numeric(lhr: Json, audit: string): number | null {
   return typeof v === 'number' ? v : null
 }
 
-function field(exp: Json, metric: string): number | null {
-  const v = exp?.metrics?.[metric]?.percentile
-  return typeof v === 'number' ? v : null
+const FIELD_KEYS: Record<string, FieldMetric> = {
+  LARGEST_CONTENTFUL_PAINT_MS: 'lcp',
+  INTERACTION_TO_NEXT_PAINT: 'inp',
+  CUMULATIVE_LAYOUT_SHIFT_SCORE: 'cls',
+  FIRST_CONTENTFUL_PAINT_MS: 'fcp',
+  EXPERIMENTAL_TIME_TO_FIRST_BYTE: 'ttfb',
+}
+const RATINGS: Record<string, FieldRating> = { FAST: 'good', AVERAGE: 'average', SLOW: 'poor' }
+
+/**
+ * CrUX data of the exact URL (PSI `loadingExperience`). When the URL itself has too little traffic
+ * PSI substitutes the origin's data and sets `origin_fallback`; that is deliberately ignored here.
+ */
+function fieldData(exp: Json): FieldData | null {
+  if (!exp?.metrics || exp.origin_fallback) return null
+  const metrics: FieldData['metrics'] = {}
+  for (const [k, key] of Object.entries(FIELD_KEYS)) {
+    const m = exp.metrics[k]
+    if (typeof m?.percentile !== 'number') continue
+    // CrUX reports CLS ×100 (e.g. 4 → 0.04)
+    const p75 = key === 'cls' ? m.percentile / 100 : m.percentile
+    metrics[key] = { p75, rating: RATINGS[m.category] ?? 'average' }
+  }
+  if (!Object.keys(metrics).length) return null
+  return { overall: RATINGS[exp.overall_category] ?? null, metrics }
 }
 
 const SAVINGS_KEYS: Record<string, keyof MetricSavings> = {
@@ -143,7 +181,7 @@ function issueDetails(audit: Json): IssueDetails | null {
 
 export function parsePsiResponse(data: Json): PsiSample {
   const lhr = data.lighthouseResult ?? {}
-  const exp = data.loadingExperience ?? {}
+  const field = fieldData(data.loadingExperience)
   const perfRefs: Json[] = lhr?.categories?.performance?.auditRefs ?? []
   const opportunities = perfRefs
     .map((ref) => lhr.audits?.[ref.id])
@@ -182,9 +220,10 @@ export function parsePsiResponse(data: Json): PsiSample {
     fcp: numeric(lhr, 'first-contentful-paint'),
     si: numeric(lhr, 'speed-index'),
     ttfb: numeric(lhr, 'server-response-time'),
-    fieldInp: field(exp, 'INTERACTION_TO_NEXT_PAINT'),
-    fieldLcp: field(exp, 'LARGEST_CONTENTFUL_PAINT_MS'),
-    fieldCls: field(exp, 'CUMULATIVE_LAYOUT_SHIFT_SCORE'),
+    fieldInp: field?.metrics.inp?.p75 ?? null,
+    fieldLcp: field?.metrics.lcp?.p75 ?? null,
+    fieldCls: field?.metrics.cls?.p75 ?? null,
+    field,
     opportunities,
   }
 }
@@ -202,6 +241,8 @@ export function aggregateSamples(samples: PsiSample[]): PsiAggregate {
     samples,
     lighthouseVersion: samples[0]?.lighthouseVersion ?? 'unknown',
     noindex: samples.some((s) => s.noindex),
+    // field data is a 28-day aggregate: identical across samples, take the first available
+    field: samples.find((s) => s.field)?.field ?? null,
     median: {
       performance: pick('performance'),
       accessibility: pick('accessibility'),

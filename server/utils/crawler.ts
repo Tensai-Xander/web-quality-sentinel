@@ -1,4 +1,6 @@
 import { chromium, type Browser } from 'playwright'
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 
 const UA_TAG = 'web-quality-sentinel/1.0 (+https://github.com/Tensai-Xander/web-quality-sentinel)'
 const UA_BASE = `Mozilla/5.0 (compatible; ${UA_TAG})`
@@ -53,6 +55,29 @@ export interface JsonLdInfo {
   types: string[]
   issues: string[]
 }
+export type A11yImpact = 'critical' | 'serious' | 'moderate' | 'minor'
+/** One axe-core rule that failed, with a sample of the affected elements. */
+export interface A11yViolation {
+  id: string
+  impact: A11yImpact
+  help: string
+  helpUrl: string
+  /** WCAG level/criteria tags, e.g. wcag2aa, wcag143; "best-practice" for non-WCAG rules. */
+  tags: string[]
+  /** Number of affected elements. */
+  nodes: number
+  /** First elements: CSS selector and HTML snippet. */
+  samples: { target: string; html: string }[]
+}
+export interface A11yInfo {
+  /** Rules that failed (axe-core violations). */
+  violations: A11yViolation[]
+  /** Total affected elements. */
+  elements: number
+  /** Rules checked without failure. */
+  passes: number
+  error?: string
+}
 export interface CrawlResult {
   url: string
   strategy: CrawlStrategy
@@ -66,6 +91,7 @@ export interface CrawlResult {
   brokenLinks: BrokenLink[]
   meta: MetaInfo
   jsonld: JsonLdInfo
+  a11y: A11yInfo
   durationMs: number
 }
 
@@ -154,6 +180,7 @@ export async function crawlPage(
 
     const meta = checkMeta(data, finalUrl)
     const jsonld = checkJsonLd(data.scripts)
+    const a11y = await checkA11y(page)
     const { total, checked, broken } = checkLinksToo
       ? await checkLinks(data.links, origin, finalUrl, opts.maxLinks)
       : { total: 0, checked: 0, broken: [] }
@@ -171,6 +198,7 @@ export async function crawlPage(
       brokenLinks: broken,
       meta,
       jsonld,
+      a11y,
       durationMs: Date.now() - started,
     }
   } finally {
@@ -256,6 +284,62 @@ function checkJsonLd(scripts: string[]): JsonLdInfo {
     }
   })
   return { count: scripts.length, types: dedupe(types), issues }
+}
+
+const A11Y_MAX_RULES = 30
+const A11Y_MAX_SAMPLES = 5
+const IMPACT_ORDER: Record<A11yImpact, number> = { critical: 0, serious: 1, moderate: 2, minor: 3 }
+
+// Read axe's browser bundle from disk instead of importing it: bundling it into the server
+// rewrites its `typeof module/window` checks, which breaks the script once injected into a page.
+let axeSource: string | undefined
+function loadAxe(): string {
+  axeSource ??= readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8')
+  return axeSource
+}
+
+/** axe-core audit of the rendered page (WCAG 2.x A/AA rules + axe best practices). */
+async function checkA11y(page: import('playwright').Page): Promise<A11yInfo> {
+  try {
+    // evaluate() is not subject to the page's CSP (unlike an injected <script>); new Function
+    // runs the bundle in the page's global scope rather than Playwright's utility scope
+    await page.evaluate((src) => new Function(src)(), loadAxe())
+    // default rule set: WCAG 2.x A/AA + axe best practices (experimental rules are off by default)
+    const raw = (await page.evaluate(`window.axe.run(document, {
+      resultTypes: ['violations'],
+    }).then((r) => ({
+      passes: r.passes.length,
+      violations: r.violations.map((v) => ({
+        id: v.id,
+        impact: v.impact,
+        help: v.help,
+        helpUrl: v.helpUrl,
+        tags: v.tags,
+        nodes: v.nodes.length,
+        samples: v.nodes.slice(0, ${A11Y_MAX_SAMPLES}).map((n) => ({
+          target: n.target.join(' '),
+          html: n.html,
+        })),
+      })),
+    }))`)) as { passes: number; violations: A11yViolation[] }
+    const violations = raw.violations
+      .filter((v) => v.impact)
+      .map((v) => ({
+        ...v,
+        helpUrl: v.helpUrl.split('?')[0]!,
+        tags: v.tags.filter((t) => /^(wcag|best-practice)/.test(t)),
+        samples: v.samples.map((n) => ({ target: n.target.slice(0, 200), html: trim(n.html) })),
+      }))
+      .sort((a, b) => IMPACT_ORDER[a.impact] - IMPACT_ORDER[b.impact] || b.nodes - a.nodes)
+      .slice(0, A11Y_MAX_RULES)
+    return {
+      violations,
+      elements: raw.violations.reduce((n, v) => n + v.nodes, 0),
+      passes: raw.passes,
+    }
+  } catch (e) {
+    return { violations: [], elements: 0, passes: 0, error: trim((e as Error).message) }
+  }
 }
 
 async function checkLinks(

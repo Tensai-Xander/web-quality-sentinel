@@ -26,7 +26,7 @@ const filtered = computed(() =>
           <option value="all">All kinds</option>
           <option value="threshold">Threshold</option>
           <option value="regression">Regression</option>
-          <option value="quality">Quality (links, JS, meta, JSON-LD)</option>
+          <option value="quality">Quality (links, JS, meta, JSON-LD, accessibility)</option>
         </select>
         <select v-model="severity">
           <option value="all">All severities</option>

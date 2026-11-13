@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      axe-core:
+        specifier: ^4.14.0
+        version: 4.14.0
       better-sqlite3:
         specifier: ^13.0.3
         version: 13.0.3
@@ -1831,6 +1834,10 @@ packages:
     hasBin: true
     peerDependencies:
       postcss: ^8.1.0
+
+  axe-core@4.14.0:
+    resolution: {integrity: sha512-9WTZxEjsZ7b13TH8JPmbV2z8CHbl80/2hm3XPEG4JgNdQLK81IBRXmSxHfMAOkSqQeRxT/0dwNDz2GOm3zzpcQ==}
+    engines: {node: '>=4'}
 
   b4a@1.9.0:
     resolution: {integrity: sha512-dpfcF9fDNR6++cthXR67iyhgqWy9CBouAvIWhIntzBG6cvK/cnIPiZQjBwi/ZqjjBEDGfoNDtmB0kTjroOJ3pQ==}
@@ -6294,6 +6301,8 @@ snapshots:
       picocolors: 1.1.1
       postcss: 8.5.32
       postcss-value-parser: 4.2.0
+
+  axe-core@4.14.0: {}
 
   b4a@1.9.0: {}
 

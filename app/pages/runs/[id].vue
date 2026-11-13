@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Run, PageResult, Alert, PageCheck } from '~~/server/db/schema'
 import type { CrawlResult } from '~~/server/utils/crawler'
-import type { Opportunity } from '~~/server/utils/psi'
+import type { FieldData, FieldMetric, Opportunity } from '~~/server/utils/psi'
 import { SCORE_METRICS, TIMING_METRICS, METRIC_LABELS, type Metric } from '~~/shared/types/sentinel'
 import { formatDate, formatDuration, formatMetric } from '~~/shared/utils/format'
 import type { AlertIssue } from '~/components/AlertTable.vue'
@@ -9,7 +9,17 @@ import type { AlertIssue } from '~/components/AlertTable.vue'
 interface Details {
   samples: Record<string, number | null | string>[]
   opportunities: Opportunity[]
+  /** CrUX data of the exact URL; absent on runs made before it was stored. */
+  field?: FieldData | null
 }
+const FIELD_METRICS: { key: FieldMetric; label: string; cwv: boolean }[] = [
+  { key: 'lcp', label: 'LCP', cwv: true },
+  { key: 'inp', label: 'INP', cwv: true },
+  { key: 'cls', label: 'CLS', cwv: true },
+  { key: 'fcp', label: 'FCP', cwv: false },
+  { key: 'ttfb', label: 'TTFB', cwv: false },
+]
+const RATING_LABELS = { good: 'Good', average: 'Needs improvement', poor: 'Poor' } as const
 interface RunDetail {
   run: Run
   results: (Omit<PageResult, 'details'> & { details: Details | null })[]
@@ -172,13 +182,6 @@ onUnmounted(() => clearInterval(timer))
                       </table>
                       <div class="muted small" style="margin-top: 0.4rem">
                         Lighthouse {{ r.lighthouseVersion }}
-                        <template
-                          v-if="r.fieldLcp != null || r.fieldInp != null || r.fieldCls != null"
-                        >
-                          · Field data (CrUX p75): LCP {{ formatMetric('lcp', r.fieldLcp) }}, INP
-                          {{ formatMetric('tbt', r.fieldInp) }}, CLS
-                          {{ formatMetric('cls', r.fieldCls == null ? null : r.fieldCls / 100) }}
-                        </template>
                       </div>
                     </div>
                     <div v-if="r.details.opportunities.length" style="flex: 1; min-width: 280px">
@@ -222,12 +225,72 @@ onUnmounted(() => clearInterval(timer))
         </table>
       </section>
 
+      <section class="card">
+        <h2>Real users (Chrome UX Report)</h2>
+        <p class="muted small" style="margin: 0 0 0.5rem">
+          What Chrome visitors of this exact URL experienced over the last 28 days (75th
+          percentile), as reported by PSI's "This URL" field data — not the lab measurement above.
+          LCP, INP and CLS are Google's Core Web Vitals. "No data" means the URL has too few Chrome
+          visitors; origin-level data is deliberately not used.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Page</th>
+              <th>Device</th>
+              <th>Overall</th>
+              <th v-for="f in FIELD_METRICS" :key="f.key" class="num">
+                {{ f.label }}<span v-if="!f.cwv" class="muted small"> *</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in sorted" :key="r.id">
+              <td>
+                <strong>{{ pageLabel(r.pageId, data.run.siteId) }}</strong>
+              </td>
+              <td>{{ r.strategy }}</td>
+              <template v-if="r.details?.field">
+                <td>
+                  <span
+                    v-if="r.details.field.overall"
+                    class="badge"
+                    :class="r.details.field.overall"
+                    >{{ RATING_LABELS[r.details.field.overall] }}</span
+                  >
+                  <span v-else class="muted">–</span>
+                </td>
+                <td v-for="f in FIELD_METRICS" :key="f.key" class="num">
+                  <span
+                    v-if="r.details.field.metrics[f.key]"
+                    class="badge"
+                    :class="r.details.field.metrics[f.key]!.rating"
+                    :title="RATING_LABELS[r.details.field.metrics[f.key]!.rating]"
+                    >{{ formatMetric(f.key, r.details.field.metrics[f.key]!.p75) }}</span
+                  >
+                  <span v-else class="muted">No data</span>
+                </td>
+              </template>
+              <td v-else :colspan="FIELD_METRICS.length + 1" class="muted">
+                No data<template v-if="r.details && !('field' in r.details)">
+                  (run made before field data was stored)</template
+                >
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="muted small" style="margin: 0.5rem 0 0">
+          * FCP and TTFB are reported by CrUX but are not Core Web Vitals. Ratings use Google's
+          fixed limits (e.g. LCP good ≤ 2.5 s, poor > 4 s; INP 200 / 500 ms; CLS 0.1 / 0.25).
+        </p>
+      </section>
+
       <section v-if="data.checks?.length" class="card">
         <h2>Quality checks</h2>
         <p class="muted small" style="margin: 0 0 0.5rem">
           One browser visit per page and device (Playwright): HTTP status, JavaScript errors, broken
-          same-site links (checked once per page), meta tags and structured data. Click a row for
-          details.
+          same-site links (checked once per page), meta tags, structured data and an axe-core
+          accessibility audit. Click a row for details.
         </p>
         <table>
           <thead>
@@ -240,6 +303,7 @@ onUnmounted(() => clearInterval(timer))
               <th class="num">Broken links</th>
               <th class="num">Meta issues</th>
               <th class="num">JSON-LD</th>
+              <th class="num">A11y</th>
               <th class="num">Time</th>
             </tr>
           </thead>
@@ -277,13 +341,20 @@ onUnmounted(() => clearInterval(timer))
                     {{ c.jsonldCount
                     }}<template v-if="c.jsonldIssues"> ({{ c.jsonldIssues }} issues)</template>
                   </td>
+                  <td
+                    class="num"
+                    :style="c.a11yIssues ? 'color: var(--average)' : ''"
+                    :title="`${c.a11yElements} element(s) affected`"
+                  >
+                    {{ c.a11yIssues }}
+                  </td>
                   <td class="num muted">
                     {{ c.durationMs ? `${(c.durationMs / 1000).toFixed(1)} s` : '–' }}
                   </td>
                 </template>
                 <td
                   v-else
-                  colspan="7"
+                  colspan="8"
                   class="small"
                   style="color: var(--poor); white-space: normal"
                 >
@@ -291,7 +362,7 @@ onUnmounted(() => clearInterval(timer))
                 </td>
               </tr>
               <tr v-if="expandedCheck === c.id && c.details">
-                <td colspan="9" style="white-space: normal; background: #fafbfc">
+                <td colspan="10" style="white-space: normal; background: #fafbfc">
                   <div class="grid small">
                     <div>
                       <h3>Meta tags</h3>
@@ -389,6 +460,69 @@ onUnmounted(() => clearInterval(timer))
                       </ul>
                       <div v-else class="muted">None.</div>
                     </div>
+                  </div>
+                  <div class="small" style="margin-top: 0.8rem">
+                    <h3>
+                      Accessibility (axe-core)
+                      <template v-if="c.details.a11y">
+                        — {{ c.details.a11y.violations.length }} rule(s) failed on
+                        {{ c.details.a11y.elements }} element(s), {{ c.details.a11y.passes }} rules
+                        passed
+                      </template>
+                    </h3>
+                    <div v-if="!c.details.a11y" class="muted">
+                      Not checked (run made before the accessibility audit was added).
+                    </div>
+                    <div v-else-if="c.details.a11y.error" style="color: var(--poor)">
+                      Audit failed: {{ c.details.a11y.error }}
+                    </div>
+                    <div v-else-if="!c.details.a11y.violations.length" class="muted">
+                      No violation.
+                    </div>
+                    <table v-else class="small">
+                      <thead>
+                        <tr>
+                          <th>Impact</th>
+                          <th>Rule</th>
+                          <th class="num">Elements</th>
+                          <th>WCAG</th>
+                          <th>Examples</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="v in c.details.a11y.violations" :key="v.id">
+                          <td>
+                            <span
+                              class="pill"
+                              :class="
+                                v.impact === 'critical' || v.impact === 'serious' ? 'fail' : 'warn'
+                              "
+                              >{{ v.impact }}</span
+                            >
+                          </td>
+                          <td style="white-space: normal">
+                            <a :href="v.helpUrl" target="_blank" rel="noopener" @click.stop>{{
+                              v.help
+                            }}</a>
+                            <div class="muted">
+                              <code>{{ v.id }}</code>
+                            </div>
+                          </td>
+                          <td class="num">{{ v.nodes }}</td>
+                          <td style="white-space: normal">
+                            {{
+                              v.tags.filter((t) => t.startsWith('wcag')).join(', ') ||
+                              'best practice'
+                            }}
+                          </td>
+                          <td style="white-space: normal; max-width: 32rem">
+                            <div v-for="n in v.samples" :key="n.target" class="muted">
+                              <code :title="n.html">{{ n.target }}</code>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </td>
               </tr>
