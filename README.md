@@ -81,6 +81,20 @@ pnpm build
 pnpm start                   # same URL, no file watching
 ```
 
+### 5. Reset the database
+
+All history (runs, results, alerts) is the single SQLite file `.data/sentinel.db`. To start from
+scratch, stop `pnpm dev`, delete it together with its journal files, and start again: an empty
+database with the current schema is recreated on the next start. Sites and pages are not affected
+(they live in `sentinel.sites.json`).
+
+```bash
+rm -f .data/sentinel.db .data/sentinel.db-wal .data/sentinel.db-shm
+pnpm dev
+```
+
+To drop a single run instead, use **Delete** on its run page (or `DELETE /api/runs/:id`).
+
 ## Configuration
 
 Sites and pages are in [`sentinel.sites.json`](./sentinel.sites.json) (written by the Settings
