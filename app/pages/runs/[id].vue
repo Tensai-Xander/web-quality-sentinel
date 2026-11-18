@@ -363,167 +363,7 @@ onUnmounted(() => clearInterval(timer))
               </tr>
               <tr v-if="expandedCheck === c.id && c.details">
                 <td colspan="10" style="white-space: normal; background: #fafbfc">
-                  <div class="grid small">
-                    <div>
-                      <h3>Meta tags</h3>
-                      <ul
-                        v-if="c.details.meta.issues.length"
-                        style="margin: 0 0 0.4rem; padding-left: 1.1rem; color: var(--average)"
-                      >
-                        <li v-for="i in c.details.meta.issues" :key="i">{{ i }}</li>
-                      </ul>
-                      <div v-else class="muted">No issue.</div>
-                      <table class="small">
-                        <tbody>
-                          <tr
-                            v-for="k in [
-                              'title',
-                              'description',
-                              'canonical',
-                              'robots',
-                              'lang',
-                              'ogTitle',
-                              'ogDescription',
-                              'ogImage',
-                            ] as const"
-                            :key="k"
-                          >
-                            <th>{{ k }}</th>
-                            <td style="white-space: normal">{{ c.details.meta[k] ?? '–' }}</td>
-                          </tr>
-                          <tr>
-                            <th>h1</th>
-                            <td>{{ c.details.meta.h1Count }}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                    <div>
-                      <h3>Structured data (JSON-LD)</h3>
-                      <div>
-                        {{ c.details.jsonld.count }} block(s)<template
-                          v-if="c.details.jsonld.types.length"
-                          >: {{ c.details.jsonld.types.join(', ') }}</template
-                        >
-                      </div>
-                      <ul
-                        v-if="c.details.jsonld.issues.length"
-                        style="margin: 0.3rem 0 0; padding-left: 1.1rem; color: var(--average)"
-                      >
-                        <li v-for="i in c.details.jsonld.issues" :key="i">{{ i }}</li>
-                      </ul>
-                      <h3 style="margin-top: 0.8rem">JavaScript errors</h3>
-                      <ul
-                        v-if="c.details.pageErrors.length || c.details.consoleErrors.length"
-                        style="margin: 0; padding-left: 1.1rem"
-                      >
-                        <li
-                          v-for="e in [...c.details.pageErrors, ...c.details.consoleErrors]"
-                          :key="e"
-                        >
-                          <code>{{ e }}</code>
-                        </li>
-                      </ul>
-                      <div v-else class="muted">None.</div>
-                    </div>
-                    <div>
-                      <h3>
-                        Broken links ({{ c.details.brokenLinks.length }} of
-                        {{ c.details.linksChecked }} checked)
-                      </h3>
-                      <ul
-                        v-if="c.details.brokenLinks.length"
-                        style="margin: 0; padding-left: 1.1rem"
-                      >
-                        <li v-for="l in c.details.brokenLinks" :key="l.url">
-                          <a :href="l.url" target="_blank" rel="noopener" @click.stop>{{
-                            l.url
-                          }}</a>
-                          <span class="pill fail" style="margin-left: 0.3em">{{
-                            l.status ?? l.error
-                          }}</span>
-                          <span v-if="l.text" class="muted"> — "{{ l.text }}"</span>
-                        </li>
-                      </ul>
-                      <div v-else class="muted">None.</div>
-                      <h3 style="margin-top: 0.8rem">
-                        Failed requests ({{ c.details.failedRequests.length }})
-                      </h3>
-                      <ul
-                        v-if="c.details.failedRequests.length"
-                        style="margin: 0; padding-left: 1.1rem"
-                      >
-                        <li v-for="f in c.details.failedRequests" :key="f.url">
-                          <code>{{ f.url }}</code>
-                          <span class="pill warn">{{ f.status ?? f.error }}</span>
-                        </li>
-                      </ul>
-                      <div v-else class="muted">None.</div>
-                    </div>
-                  </div>
-                  <div class="small" style="margin-top: 0.8rem">
-                    <h3>
-                      Accessibility (axe-core)
-                      <template v-if="c.details.a11y">
-                        — {{ c.details.a11y.violations.length }} rule(s) failed on
-                        {{ c.details.a11y.elements }} element(s), {{ c.details.a11y.passes }} rules
-                        passed
-                      </template>
-                    </h3>
-                    <div v-if="!c.details.a11y" class="muted">
-                      Not checked (run made before the accessibility audit was added).
-                    </div>
-                    <div v-else-if="c.details.a11y.error" style="color: var(--poor)">
-                      Audit failed: {{ c.details.a11y.error }}
-                    </div>
-                    <div v-else-if="!c.details.a11y.violations.length" class="muted">
-                      No violation.
-                    </div>
-                    <table v-else class="small">
-                      <thead>
-                        <tr>
-                          <th>Impact</th>
-                          <th>Rule</th>
-                          <th class="num">Elements</th>
-                          <th>WCAG</th>
-                          <th>Examples</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="v in c.details.a11y.violations" :key="v.id">
-                          <td>
-                            <span
-                              class="pill"
-                              :class="
-                                v.impact === 'critical' || v.impact === 'serious' ? 'fail' : 'warn'
-                              "
-                              >{{ v.impact }}</span
-                            >
-                          </td>
-                          <td style="white-space: normal">
-                            <a :href="v.helpUrl" target="_blank" rel="noopener" @click.stop>{{
-                              v.help
-                            }}</a>
-                            <div class="muted">
-                              <code>{{ v.id }}</code>
-                            </div>
-                          </td>
-                          <td class="num">{{ v.nodes }}</td>
-                          <td style="white-space: normal">
-                            {{
-                              v.tags.filter((t) => t.startsWith('wcag')).join(', ') ||
-                              'best practice'
-                            }}
-                          </td>
-                          <td style="white-space: normal; max-width: 32rem">
-                            <div v-for="n in v.samples" :key="n.target" class="muted">
-                              <code :title="n.html">{{ n.target }}</code>
-                            </div>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                  <CheckDetail :details="c.details" />
                 </td>
               </tr>
             </template>
@@ -533,7 +373,12 @@ onUnmounted(() => clearInterval(timer))
 
       <section class="card">
         <h2>Alerts ({{ data.alerts.length }})</h2>
-        <AlertTable :alerts="data.alerts" :site-id="data.run.siteId" :issues-for="issuesFor" />
+        <AlertTable
+          :alerts="data.alerts"
+          :checks="data.checks"
+          :site-id="data.run.siteId"
+          :issues-for="issuesFor"
+        />
         <p class="muted small" style="margin-top: 0.5rem">
           Thresholds and regression rules are defined in <code>sentinel.config.ts</code>.
           Regressions compare with the median of the previous

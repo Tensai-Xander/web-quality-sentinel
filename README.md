@@ -146,8 +146,10 @@ After the PSI samples of a page, the runner opens it in headless Chromium once p
   audit gives the list of concrete problems behind it, on the real mobile and desktop rendering.
 
 Each finding raises a _quality_ alert (`fail` for HTTP errors, broken links and critical/serious
-accessibility violations, `warn` otherwise) and the details are shown in the run page under
-"Quality checks". `pnpm install` downloads
+accessibility violations, `warn` otherwise). Click a quality alert's message — in the Overview,
+the run page or the Alerts page — to expand the matching detail in place (broken URLs and their
+status, error messages, meta tag values, JSON-LD issues, failed axe rules with the affected
+elements); the run page's "Quality checks" table shows the full detail of every page and device. `pnpm install` downloads
 Playwright; the browser itself is fetched on first install with `pnpm exec playwright install chromium`
 (see Install).
 

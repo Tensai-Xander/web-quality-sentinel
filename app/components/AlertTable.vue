@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import type { Alert } from '~~/server/db/schema'
+import type { Alert, PageCheck } from '~~/server/db/schema'
+import type { CrawlResult } from '~~/server/utils/crawler'
 import type { IssueDetails } from '~~/server/utils/psi'
 import { formatMetric, formatDate } from '~~/shared/utils/format'
-import { METRIC_LABELS, QUALITY_LABELS } from '~~/shared/types/sentinel'
+import { METRIC_LABELS, QUALITY_LABELS, type QualityMetric } from '~~/shared/types/sentinel'
+
+export type CheckRow = Omit<PageCheck, 'details'> & { details: CrawlResult | null }
 
 export interface AlertIssue {
   id: string
@@ -12,17 +15,49 @@ export interface AlertIssue {
   details?: IssueDetails | null
 }
 
-defineProps<{
+const props = defineProps<{
   alerts: Alert[]
   showRun?: boolean
   /** Site the alerts belong to (for page labels). */
   siteId?: string | null
   /** Optional: Lighthouse issues that affect the alert's metric, shown under the message. */
   issuesFor?: (alert: Alert) => AlertIssue[]
+  /**
+   * Browser checks of the alerts' run, so quality alerts can expand their detail in place.
+   * When omitted (alerts of several runs), the run is fetched on first expand.
+   */
+  checks?: CheckRow[]
 }>()
 const { pageLabel } = useSentinel()
 const openIssue = ref<string | null>(null)
 const toggle = (key: string) => (openIssue.value = openIssue.value === key ? null : key)
+
+const openCheck = ref<number | null>(null)
+const fetched = reactive(new Map<number, CheckRow[] | null>())
+const loading = ref(false)
+async function toggleCheck(a: Alert) {
+  if (openCheck.value === a.id) {
+    openCheck.value = null
+    return
+  }
+  openCheck.value = a.id
+  if (props.checks || fetched.has(a.runId)) return
+  loading.value = true
+  try {
+    const run = await $fetch<{ checks?: CheckRow[] }>(`/api/runs/${a.runId}`)
+    fetched.set(a.runId, run?.checks ?? [])
+  } catch {
+    fetched.set(a.runId, null)
+  } finally {
+    loading.value = false
+  }
+}
+/** Browser check (page + device) behind a quality alert; undefined while loading, null if none. */
+function checkFor(a: Alert) {
+  const rows = props.checks ?? fetched.get(a.runId)
+  if (rows === undefined) return undefined
+  return rows?.find((c) => c.pageId === a.pageId && c.strategy === a.strategy) ?? null
+}
 </script>
 
 <template>
@@ -71,7 +106,32 @@ const toggle = (key: string) => (openIssue.value = openIssue.value === key ? nul
           }}
         </td>
         <td style="white-space: normal">
-          {{ a.message }}
+          <span
+            v-if="a.kind === 'quality'"
+            class="issue-toggle"
+            :class="{ open: openCheck === a.id }"
+            title="Show details"
+            @click="toggleCheck(a)"
+            >{{ a.message }}</span
+          >
+          <template v-else>{{ a.message }}</template>
+          <div v-if="a.kind === 'quality' && openCheck === a.id" class="issue-detail">
+            <template v-if="checkFor(a) === undefined">
+              <span class="muted small">{{ loading ? 'Loading…' : 'Details unavailable.' }}</span>
+            </template>
+            <CheckDetail
+              v-else-if="checkFor(a)?.details"
+              :details="checkFor(a)!.details!"
+              :only="a.metric as QualityMetric"
+            />
+            <span v-else class="muted small">
+              {{
+                checkFor(a)?.error
+                  ? `Browser check failed: ${checkFor(a)!.error}`
+                  : 'No browser-check detail stored for this page and device.'
+              }}
+            </span>
+          </div>
           <ul
             v-if="issuesFor && issuesFor(a).length"
             class="small muted"

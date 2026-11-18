@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { Run, PageResult, Alert } from '~~/server/db/schema'
+import type { Run, PageResult, Alert, PageCheck } from '~~/server/db/schema'
+import type { CrawlResult } from '~~/server/utils/crawler'
 import { SCORE_METRICS, METRIC_LABELS } from '~~/shared/types/sentinel'
 import { formatDate, formatDuration } from '~~/shared/utils/format'
 
@@ -8,6 +9,7 @@ interface RunDetail {
   run: Run
   results: PageResult[]
   alerts: Alert[]
+  checks?: (Omit<PageCheck, 'details'> & { details: CrawlResult | null })[]
 }
 
 const { config, site, siteId } = useSentinel()
@@ -180,7 +182,7 @@ onUnmounted(() => clearInterval(timer))
 
       <section v-if="latest.alerts.length" class="card">
         <h2>Alerts in this run</h2>
-        <AlertTable :alerts="latest.alerts" :site-id="siteId" />
+        <AlertTable :alerts="latest.alerts" :checks="latest.checks" :site-id="siteId" />
       </section>
     </template>
 
