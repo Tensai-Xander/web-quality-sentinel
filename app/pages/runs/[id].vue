@@ -3,7 +3,7 @@ import type { Run, PageResult, Alert, PageCheck } from '~~/server/db/schema'
 import type { CrawlResult } from '~~/server/utils/crawler'
 import type { FieldData, FieldMetric, Opportunity } from '~~/server/utils/psi'
 import { SCORE_METRICS, TIMING_METRICS, METRIC_LABELS, type Metric } from '~~/shared/types/sentinel'
-import { formatDate, formatDuration, formatMetric } from '~~/shared/utils/format'
+import { formatDate, formatDuration, formatMetric, formatTime } from '~~/shared/utils/format'
 import type { AlertIssue } from '~/components/AlertTable.vue'
 
 interface Details {
@@ -166,6 +166,7 @@ onUnmounted(() => clearInterval(timer))
                         <thead>
                           <tr>
                             <th>#</th>
+                            <th>Analysed at</th>
                             <th v-for="m in metrics" :key="m" class="num">
                               {{ METRIC_LABELS[m] }}
                             </th>
@@ -174,6 +175,7 @@ onUnmounted(() => clearInterval(timer))
                         <tbody>
                           <tr v-for="(s, i) in r.details.samples" :key="i">
                             <td>{{ i + 1 }}</td>
+                            <td class="muted">{{ formatTime(s.fetchTime as string) }}</td>
                             <td v-for="m in metrics" :key="m" class="num">
                               {{ formatMetric(m, s[m] as number | null) }}
                             </td>
@@ -181,7 +183,8 @@ onUnmounted(() => clearInterval(timer))
                         </tbody>
                       </table>
                       <div class="muted small" style="margin-top: 0.4rem">
-                        Lighthouse {{ r.lighthouseVersion }}
+                        Lighthouse {{ r.lighthouseVersion }} · each sample is a separate Lighthouse
+                        analysis (samples after the first use a cache-busting URL parameter)
                       </div>
                     </div>
                     <div v-if="r.details.opportunities.length" style="flex: 1; min-width: 280px">

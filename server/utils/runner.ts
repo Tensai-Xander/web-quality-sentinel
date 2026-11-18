@@ -83,7 +83,11 @@ async function processRun(runId: number, site: SiteConfig, pageIds: string[]) {
 
         for (let i = 0; i < config.psi.samples; i++) {
           try {
-            samples.push(await fetchPsi(url, strategy, config.psi.categories, psiApiKey))
+            // PSI serves a cached copy when the same URL is requested again within minutes, so
+            // only the first sample uses the exact URL (keeps the "This URL" field data); the
+            // others carry a throw-away query parameter to force a fresh Lighthouse analysis.
+            const sampleUrl = i === 0 ? url : cacheBustUrl(url)
+            samples.push(await fetchPsi(sampleUrl, strategy, config.psi.categories, psiApiKey))
           } catch (err) {
             const e = err as PsiError
             error = e.message

@@ -209,7 +209,10 @@ function alreadyHas(site: ClientSite, path: string) {
           </tr>
           <tr>
             <th>PSI samples</th>
-            <td>{{ config.psi.samples }} per page × device, {{ config.psi.delayMs }} ms apart</td>
+            <td>
+              {{ config.psi.samples }} per page × device, {{ config.psi.delayMs }} ms apart (samples
+              after the first use a cache-busting URL parameter)
+            </td>
           </tr>
           <tr>
             <th>Browser checks</th>

@@ -6,6 +6,8 @@ const config: SentinelConfig = {
 
   strategies: ['mobile', 'desktop'],
 
+  // PSI caches a URL's result for a few minutes; samples after the first add a throw-away
+  // `?sentinel=` query parameter so each one is a real Lighthouse analysis.
   psi: {
     samples: 3,
     delayMs: 1500,
