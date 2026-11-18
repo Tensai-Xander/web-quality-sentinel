@@ -169,13 +169,29 @@ users OK?", while the lab metrics answer "did the last release change something?
 
 1. **Noise reduction** – each page × device is measured `psi.samples` times (default 3) and the
    median of every metric is stored.
-2. **Thresholds** – each stored value is compared with the absolute limits. `warn` when it is
-   slightly over, `fail` when it is far over (score 10+ points below, timing 1.5× the limit).
+2. **Thresholds** – each stored value is compared with the absolute limits (`thresholds`, or the
+   site/page override). Any breach raises a _threshold_ alert.
 3. **Baseline** – the median of the same page × device × metric over the previous
    `regression.baselineRuns` completed runs (at least 2 runs are required, so the first two runs
    never produce regression alerts).
 4. **Regression** – a score lower than the baseline by `scoreDrop` points, or a timing higher by
-   `timingIncreasePct` _and_ by more than the per-metric noise floor `minDelta`.
+   `timingIncreasePct` _and_ by more than the per-metric noise floor `minDelta`, raises a
+   _regression_ alert.
+
+### Alert severity (`warn` / `fail`)
+
+The severity only depends on how far the value is from the limit:
+
+| Alert                              | `warn`                                | `fail`                                     |
+| ---------------------------------- | ------------------------------------- | ------------------------------------------ |
+| Threshold, score (perf, a11y, …)   | below the minimum                     | more than 10 points below the minimum      |
+| Threshold, timing (LCP, CLS, TBT…) | over the maximum                      | over 1.5 × the maximum                     |
+| Regression, score                  | drop ≥ `scoreDrop` (10 pts)           | drop ≥ 2 × `scoreDrop` (20 pts)            |
+| Regression, timing                 | increase ≥ `timingIncreasePct` (50 %) | increase ≥ 2 × `timingIncreasePct` (100 %) |
+
+Example with the default `performance: 50`: a score of 42 is a `warn`, 38 (more than 10 points
+under) is a `fail`. Quality alerts (browser checks) have their own rule: HTTP errors, broken links
+and critical/serious axe violations are `fail`, everything else is `warn`.
 
 ## Triggering a run from a release pipeline
 
