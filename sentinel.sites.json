@@ -103,6 +103,88 @@
           "path": "/services/kinto-go"
         }
       ]
+    },
+    {
+      "id": "factory",
+      "name": "Kinto Factory",
+      "baseUrl": "https://factory.kinto-jp.com",
+      "pages": [
+        {
+          "id": "home",
+          "label": "Home",
+          "path": "/"
+        },
+        {
+          "id": "dealers",
+          "label": "Dealers",
+          "path": "/dealers"
+        },
+        {
+          "id": "magazine",
+          "label": "Magazine",
+          "path": "/magazine"
+        },
+        {
+          "id": "models",
+          "label": "Models",
+          "path": "/models"
+        },
+        {
+          "id": "news",
+          "label": "News",
+          "path": "/news"
+        },
+        {
+          "id": "service",
+          "label": "Service",
+          "path": "/service"
+        },
+        {
+          "id": "cp-bz001-bzt01",
+          "label": "Cp Bz001 Bzt01",
+          "path": "/cp/BZ001-BZT01"
+        },
+        {
+          "id": "lp-convenient-products",
+          "label": "Lp Convenient Products",
+          "path": "/lp/convenient-products"
+        },
+        {
+          "id": "lp-lexus",
+          "label": "Lp Lexus",
+          "path": "/lp/lexus"
+        },
+        {
+          "id": "magazine-posts",
+          "label": "Magazine Posts",
+          "path": "/magazine/posts"
+        },
+        {
+          "id": "products-lc207-14",
+          "label": "Products Lc207 14",
+          "path": "/products/LC207_14"
+        },
+        {
+          "id": "service-pay-easy",
+          "label": "Service Pay Easy",
+          "path": "/service/pay-easy"
+        },
+        {
+          "id": "magazine-voc-voc-4",
+          "label": "Magazine Voc Voc 4",
+          "path": "/magazine/voc/voc-4"
+        },
+        {
+          "id": "products-vehicle-bz001",
+          "label": "Products Vehicle Bz001",
+          "path": "/products/vehicle/BZ001"
+        },
+        {
+          "id": "magazine-category-upgrade",
+          "label": "Magazine Category Upgrade",
+          "path": "/magazine/category/upgrade/3"
+        }
+      ]
     }
   ]
 }
