@@ -134,9 +134,22 @@ onUnmounted(() => clearInterval(timer))
             </tr>
           </thead>
           <tbody>
-            <tr v-for="p in site?.pages ?? []" :key="p.id">
+            <tr
+              v-for="p in site?.pages ?? []"
+              :key="p.id"
+              :class="{ clickable: latest }"
+              :title="latest ? `Open run #${latest.run.id}, ${p.label}` : undefined"
+              @click="latest && navigateTo(`/runs/${latest.run.id}?page=${p.id}`)"
+            >
               <td>
-                <strong>{{ p.label }}</strong>
+                <NuxtLink
+                  v-if="latest"
+                  :to="`/runs/${latest.run.id}?page=${p.id}`"
+                  style="color: inherit"
+                  @click.stop
+                  ><strong>{{ p.label }}</strong></NuxtLink
+                >
+                <strong v-else>{{ p.label }}</strong>
                 <div class="muted small">{{ p.path }}</div>
               </td>
               <template v-if="resultFor(latest, p.id)?.status === 'ok'">

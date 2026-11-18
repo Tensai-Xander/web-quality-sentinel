@@ -82,6 +82,23 @@ async function remove() {
 }
 
 let timer: ReturnType<typeof setInterval> | undefined
+// `?page=<pageId>` (link from the Overview): open that page's first row and scroll to it.
+watch(
+  sorted,
+  (rows) => {
+    const pageId = route.query.page
+    if (typeof pageId !== 'string' || expanded.value !== null) return
+    const r = rows.find((x) => x.pageId === pageId)
+    if (!r) return
+    expanded.value = r.id
+    nextTick(() =>
+      document
+        .getElementById(`result-${r.id}`)
+        ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    )
+  },
+  { immediate: true }
+)
 onMounted(() => {
   timer = setInterval(() => {
     if (data.value?.run.status === 'running') refresh()
@@ -128,7 +145,11 @@ onUnmounted(() => clearInterval(timer))
           </thead>
           <tbody>
             <template v-for="r in sorted" :key="r.id">
-              <tr class="clickable" @click="expanded = expanded === r.id ? null : r.id">
+              <tr
+                :id="`result-${r.id}`"
+                class="clickable"
+                @click="expanded = expanded === r.id ? null : r.id"
+              >
                 <td>
                   <strong>{{ pageLabel(r.pageId, data.run.siteId) }}</strong>
                   <span
@@ -183,8 +204,7 @@ onUnmounted(() => clearInterval(timer))
                         </tbody>
                       </table>
                       <div class="muted small" style="margin-top: 0.4rem">
-                        Lighthouse {{ r.lighthouseVersion }} · each sample is a separate Lighthouse
-                        analysis (samples after the first use a cache-busting URL parameter)
+                        Lighthouse {{ r.lighthouseVersion }}
                       </div>
                     </div>
                     <div v-if="r.details.opportunities.length" style="flex: 1; min-width: 280px">
