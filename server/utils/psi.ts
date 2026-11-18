@@ -287,3 +287,10 @@ export async function fetchPsi(
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** Same page, unique URL string: PSI caches results per URL for a few minutes. */
+export function cacheBustUrl(url: string): string {
+  const u = new URL(url)
+  u.searchParams.set('sentinel', Date.now().toString(36))
+  return u.toString()
+}

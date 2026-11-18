@@ -168,7 +168,11 @@ users OK?", while the lab metrics answer "did the last release change something?
 ## How regressions are detected
 
 1. **Noise reduction** – each page × device is measured `psi.samples` times (default 3) and the
-   median of every metric is stored.
+   median of every metric is stored. PSI returns a cached copy when the same URL is requested
+   again within a few minutes, so only the first sample uses the exact URL (it provides the
+   "This URL" field data); the following ones add a throw-away `?sentinel=<id>` query parameter,
+   which makes Google run a fresh Lighthouse analysis of the same page. The run page's "Samples"
+   table shows the analysis time of each sample.
 2. **Thresholds** – each stored value is compared with the absolute limits (`thresholds`, or the
    site/page override). Any breach raises a _threshold_ alert.
 3. **Baseline** – the median of the same page × device × metric over the previous

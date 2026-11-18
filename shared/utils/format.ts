@@ -30,6 +30,12 @@ export function formatDate(iso: string | null | undefined): string {
   })
 }
 
+export function formatTime(iso: string | null | undefined): string {
+  if (!iso) return '–'
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '–' : d.toLocaleTimeString('en-GB')
+}
+
 export function formatDuration(startIso: string, endIso: string | null | undefined): string {
   if (!endIso) return '…'
   const s = Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 1000)
