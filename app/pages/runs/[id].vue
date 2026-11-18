@@ -82,23 +82,15 @@ async function remove() {
 }
 
 let timer: ReturnType<typeof setInterval> | undefined
-// `?page=<pageId>` (link from the Overview): open that page's first row and scroll to it.
-watch(
-  sorted,
-  (rows) => {
-    const pageId = route.query.page
-    if (typeof pageId !== 'string' || expanded.value !== null) return
-    const r = rows.find((x) => x.pageId === pageId)
-    if (!r) return
-    expanded.value = r.id
-    nextTick(() =>
-      document
-        .getElementById(`result-${r.id}`)
-        ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-    )
-  },
-  { immediate: true }
-)
+// Link from the Overview: `?page=<pageId>` opens that page's first row; the `#page-<pageId>`
+// hash (same row's id) lets the router scroll to it.
+function openPageFromQuery() {
+  const pageId = route.query.page
+  if (typeof pageId !== 'string' || expanded.value !== null) return
+  const r = sorted.value.find((x) => x.pageId === pageId)
+  if (r) expanded.value = r.id
+}
+watch(sorted, openPageFromQuery, { immediate: true })
 onMounted(() => {
   timer = setInterval(() => {
     if (data.value?.run.status === 'running') refresh()
@@ -146,7 +138,9 @@ onUnmounted(() => clearInterval(timer))
           <tbody>
             <template v-for="r in sorted" :key="r.id">
               <tr
-                :id="`result-${r.id}`"
+                :id="
+                  sorted.find((x) => x.pageId === r.pageId) === r ? `page-${r.pageId}` : undefined
+                "
                 class="clickable"
                 @click="expanded = expanded === r.id ? null : r.id"
               >
