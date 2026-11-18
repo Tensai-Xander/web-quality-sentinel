@@ -81,6 +81,24 @@ async function remove() {
   await navigateTo('/')
 }
 
+/** Starts a new run limited to one page (both devices) and opens it. */
+const rerunning = ref(false)
+async function rerunPage(pageId: string) {
+  if (!data.value || rerunning.value) return
+  rerunning.value = true
+  try {
+    const res = await $fetch<{ runId: number; started: boolean }>('/api/runs', {
+      method: 'POST',
+      body: { trigger: 'manual', siteId: data.value.run.siteId, pageIds: [pageId] },
+    })
+    await navigateTo(`/runs/${res.runId}`)
+  } catch {
+    alert('A run is already in progress; wait for it to finish and try again.')
+  } finally {
+    rerunning.value = false
+  }
+}
+
 let timer: ReturnType<typeof setInterval> | undefined
 // Link from the Overview: `?page=<pageId>` opens that page's first row; the `#page-<pageId>`
 // hash (same row's id) lets the router scroll to it.
@@ -154,6 +172,16 @@ onUnmounted(() => clearInterval(timer))
                   >
                   <div class="muted small">
                     <a :href="r.url" target="_blank" rel="noopener" @click.stop>{{ r.url }}</a>
+                    <template v-if="sorted.find((x) => x.pageId === r.pageId) === r">
+                      ·
+                      <a
+                        href="#"
+                        :title="`Start a new run measuring only this page (${config?.strategies.join(' + ')})`"
+                        :aria-disabled="rerunning || config?.activeRun != null"
+                        @click.stop.prevent="rerunPage(r.pageId)"
+                        >re-run page</a
+                      >
+                    </template>
                   </div>
                 </td>
                 <td>{{ r.strategy }}</td>
@@ -169,6 +197,8 @@ onUnmounted(() => clearInterval(timer))
                   style="color: var(--poor); white-space: normal"
                 >
                   {{ r.error }}
+                  —
+                  <a href="#" @click.stop.prevent="rerunPage(r.pageId)">re-run this page</a>
                 </td>
                 <td class="num">{{ r.samples }}</td>
               </tr>
