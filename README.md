@@ -110,6 +110,26 @@ through git). The global rules live in [`sentinel.config.ts`](./sentinel.config.
 | `thresholds` | Absolute limits: minimum scores (0–100) and maximum LCP/CLS/TBT/FCP. Defaults are Lighthouse's red ("poor") boundaries. Breaches raise _threshold_ alerts. Pages that are not indexable (`noindex`, detected via the Lighthouse `is-crawlable` audit) are never alerted on SEO. |
 | `regression` | Relative limits vs. the baseline (median of the previous `baselineRuns` completed runs).                                                                                                                                                                                        |
 
+### Where the default thresholds come from
+
+The default limits are Google's own "poor" (red) lines, so an alert means "Google would show
+this metric in red" — not the "good" (green) lines, which these sites do not reach yet and would
+alert on every run.
+
+| Metric                   | Google: good | Google: poor | Default limit  | Source                                                                                                         |
+| ------------------------ | ------------ | ------------ | -------------- | -------------------------------------------------------------------------------------------------------------- |
+| Performance score        | 90–100       | 0–49         | ≥ 50           | [Lighthouse performance scoring](https://developer.chrome.com/docs/lighthouse/performance/performance-scoring) |
+| LCP (Core Web Vital)     | ≤ 2.5 s      | > 4 s        | ≤ 4 s          | [web.dev/lcp](https://web.dev/articles/lcp)                                                                    |
+| CLS (Core Web Vital)     | ≤ 0.1        | > 0.25       | ≤ 0.25         | [web.dev/cls](https://web.dev/articles/cls)                                                                    |
+| TBT (lab proxy for INP)  | ≤ 200 ms     | > 600 ms     | ≤ 600 ms       | [web.dev/tbt](https://web.dev/articles/tbt)                                                                    |
+| FCP                      | ≤ 1.8 s      | > 3 s        | ≤ 3 s          | [web.dev/fcp](https://web.dev/articles/fcp)                                                                    |
+| Accessibility / BP / SEO | 90–100       | 0–49         | ≥ 90 / 80 / 90 | project choice ("stay green"), not a Google line                                                               |
+
+Core Web Vitals (LCP, INP, CLS) are what Google's ranking signal uses, assessed on real users at
+the 75th percentile — the "Real users" section shows those field values; the thresholds above are
+applied to the lab (Lighthouse) values of each run. Change the limits in `sentinel.config.ts`, or
+per site / page in Settings.
+
 Restart the dev server after editing `sentinel.config.ts` (`sentinel.sites.json` is re-read automatically). Environment variables (`.env`):
 
 | Variable            | Purpose                                                              |
