@@ -84,6 +84,10 @@ export interface SentinelConfig {
     samples: number
     /** Pause between PSI requests (ms) to stay inside the free quota. */
     delayMs: number
+    /** Extra attempts for a sample whose request failed on the network (or a 5xx from Google). */
+    retries: number
+    /** Pause before such a retry (ms). */
+    retryDelayMs: number
     /** Lighthouse categories to request. */
     categories: ('performance' | 'accessibility' | 'best-practices' | 'seo')[]
   }

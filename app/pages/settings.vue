@@ -224,7 +224,8 @@ function alreadyHas(site: ClientSite, path: string) {
             <th>PSI samples</th>
             <td>
               {{ config.psi.samples }} per page × device, {{ config.psi.delayMs }} ms apart (samples
-              after the first use a cache-busting URL parameter)
+              after the first use a cache-busting URL parameter); a sample that fails on the network
+              is retried {{ config.psi.retries }}× after {{ config.psi.retryDelayMs }} ms
             </td>
           </tr>
           <tr>

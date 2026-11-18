@@ -11,6 +11,10 @@ const config: SentinelConfig = {
   psi: {
     samples: 3,
     delayMs: 1500,
+    // a sample that fails on the network ("fetch failed", timeout) or with a Google 5xx is
+    // tried again `retries` times, `retryDelayMs` later; quota / key errors are never retried
+    retries: 1,
+    retryDelayMs: 5000,
     categories: ['performance', 'accessibility', 'best-practices', 'seo'],
   },
 

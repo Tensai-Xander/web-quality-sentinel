@@ -32,8 +32,16 @@ The whole procedure for a new team or a new website takes about 10 minutes.
   [Google Cloud console](https://console.cloud.google.com/), create a project, open
   _APIs & Services → Library_ and enable "PageSpeed Insights API", then _Credentials → Create
   credentials → API key_ (optionally restrict the key to that API). Each team should use its own
-  key: the quota is 25 000 requests per day per project. Without a key the anonymous quota is
-  tiny and shared, so requests are often rejected with `429`.
+  key. Without a key the anonymous quota is tiny and shared, so requests are often rejected with
+  `429`.
+
+  **PSI API quota** (Google's defaults, free, per Cloud project — visible under _APIs & Services →
+  PageSpeed Insights API → Quotas_): **25 000 requests per day** and **400 requests per 100
+  seconds**. One run costs `pages × devices × psi.samples` requests (e.g. 8 pages × 2 devices × 3
+  samples = 48, plus retries), so the daily quota allows roughly 500 such runs; the per-100 s
+  limit is never reached because requests are sequential and spaced by `psi.delayMs`. When the
+  daily quota is exhausted the run stops with `PSI 429: Quota exceeded…` and the counter resets
+  at midnight Pacific time. A higher quota can be requested in the same console page.
 
 ### 2. Install
 
@@ -106,7 +114,7 @@ through git). The global rules live in [`sentinel.config.ts`](./sentinel.config.
 | `sites`      | _(in `sentinel.sites.json`)_ `id` (stored with every run — keep it stable), `name`, `baseUrl`, `pages`, optional `thresholds` overrides. The first site is selected by default in the dashboard.                                                                                                                                                          |
 | `pages`      | _(per site, in `sentinel.sites.json`)_ `id` (stable key of the page's history), `label`, `path` (appended to `baseUrl`), optional per-page `thresholds`. Editable in Settings.                                                                                                                                                                            |
 | `strategies` | `['mobile', 'desktop']` — remove one to halve the number of PSI requests.                                                                                                                                                                                                                                                                                 |
-| `psi`        | `samples` (median is stored), `delayMs` between requests, Lighthouse `categories`.                                                                                                                                                                                                                                                                        |
+| `psi`        | `samples` (median is stored), `delayMs` between requests, Lighthouse `categories`, `retries` / `retryDelayMs` for samples that fail on the network.                                                                                                                                                                                                       |
 | `thresholds` | Absolute limits, two lines per metric `{ warn, fail }` for the scores (0–100, alert when below) and LCP/CLS/TBT/FCP (alert when above). Defaults are Google's colour-band boundaries (see below). Breaches raise _threshold_ alerts. Pages that are not indexable (`noindex`, detected via the Lighthouse `is-crawlable` audit) are never alerted on SEO. |
 | `regression` | Relative limits vs. the baseline (median of the previous `baselineRuns` completed runs).                                                                                                                                                                                                                                                                  |
 
@@ -197,7 +205,12 @@ users OK?", while the lab metrics answer "did the last release change something?
    again within a few minutes, so only the first sample uses the exact URL (it provides the
    "This URL" field data); the following ones add a throw-away `?sentinel=<id>` query parameter,
    which makes Google run a fresh Lighthouse analysis of the same page. The run page's "Samples"
-   table shows the analysis time of each sample.
+   table shows the analysis time of each sample. A sample whose request never reached Google
+   (`fetch failed (ENOTFOUND …)`, `ECONNRESET`, timeout — i.e. a network problem between your
+   machine and `www.googleapis.com`, not a problem with the monitored site) or got a 5xx answer
+   is retried `psi.retries` times after `psi.retryDelayMs`; quota (`429`) and key (`400`/`403`)
+   errors are never retried and stop the run. A page × device whose samples all failed is stored
+   with the last error message and no metrics.
 2. **Thresholds** – each stored value is compared with the two absolute lines of its metric
    (`thresholds`, or the site/page override). Crossing a line raises a _threshold_ alert.
 3. **Baseline** – the median of the same page × device × metric over the previous

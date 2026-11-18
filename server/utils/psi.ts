@@ -1,4 +1,4 @@
-import type { Strategy } from '~~/shared/types/sentinel'
+import type { SentinelConfig, Strategy } from '~~/shared/types/sentinel'
 
 export type MetricSavings = Partial<Record<'lcp' | 'cls' | 'tbt' | 'fcp' | 'si' | 'inp', number>>
 
@@ -272,7 +272,12 @@ export async function fetchPsi(
   if (apiKey) params.set('key', apiKey)
 
   const { psiEndpoint } = useRuntimeConfig()
-  const res = await fetch(`${psiEndpoint}?${params}`, { signal: AbortSignal.timeout(120_000) })
+  let res: Response
+  try {
+    res = await fetch(`${psiEndpoint}?${params}`, { signal: AbortSignal.timeout(120_000) })
+  } catch (err) {
+    throw new PsiError(describeNetworkError(err))
+  }
   if (!res.ok) {
     let detail = ''
     try {
@@ -284,6 +289,42 @@ export async function fetchPsi(
     throw new PsiError(`PSI ${res.status}${detail ? `: ${detail}` : ''}`, res.status)
   }
   return parsePsiResponse(await res.json())
+}
+
+/**
+ * Node reports every transport failure as a bare `TypeError: fetch failed`; the useful part
+ * (ENOTFOUND, ECONNRESET, certificate error…) sits in `cause`.
+ */
+function describeNetworkError(err: unknown): string {
+  const e = err as Error & { cause?: { code?: string; message?: string; hostname?: string } }
+  if (e?.name === 'TimeoutError') return 'PSI request timed out after 120 s'
+  const base = e?.message ?? String(err)
+  const cause = e?.cause
+  const detail = [cause?.code ?? cause?.message, cause?.hostname].filter(Boolean).join(' ')
+  return detail
+    ? `${base} (${detail}) — network problem between this machine and ${new URL(useRuntimeConfig().psiEndpoint).host}`
+    : base
+}
+
+/** Retries transport failures and Google 5xx answers; quota / key / bad-request errors are final. */
+export async function fetchPsiWithRetry(
+  url: string,
+  strategy: Strategy,
+  config: SentinelConfig['psi'],
+  apiKey: string | undefined,
+  label: string
+): Promise<PsiSample> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetchPsi(url, strategy, config.categories, apiKey)
+    } catch (err) {
+      const e = err as PsiError
+      const transient = e.status === undefined || e.status >= 500
+      if (!transient || attempt >= config.retries) throw err
+      console.warn(`[sentinel] ${label}: ${e.message}; retrying in ${config.retryDelayMs} ms`)
+      await sleep(config.retryDelayMs)
+    }
+  }
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))

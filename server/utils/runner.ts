@@ -87,7 +87,15 @@ async function processRun(runId: number, site: SiteConfig, pageIds: string[]) {
             // only the first sample uses the exact URL (keeps the "This URL" field data); the
             // others carry a throw-away query parameter to force a fresh Lighthouse analysis.
             const sampleUrl = i === 0 ? url : cacheBustUrl(url)
-            samples.push(await fetchPsi(sampleUrl, strategy, config.psi.categories, psiApiKey))
+            samples.push(
+              await fetchPsiWithRetry(
+                sampleUrl,
+                strategy,
+                config.psi,
+                psiApiKey,
+                `${strategy} ${url} sample ${i + 1}`
+              )
+            )
           } catch (err) {
             const e = err as PsiError
             error = e.message
