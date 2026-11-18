@@ -15,17 +15,18 @@ const config: SentinelConfig = {
   },
 
   // Absolute limits, for every site unless a site or a page overrides them (Settings page).
-  // A page breaching one of them raises a "threshold" alert.
-  // Performance values are Lighthouse's "poor" (red) boundaries.
+  // Two lines per metric, taken from Google's colour bands: crossing `warn` (green → orange)
+  // raises a warn alert, crossing `fail` (orange → red) a fail alert. Scores alert below the
+  // line, timings (ms, CLS unitless) above it.
   thresholds: {
-    performance: 50,
-    accessibility: 90,
-    bestPractices: 80,
-    seo: 90,
-    lcp: 4000,
-    cls: 0.25,
-    tbt: 600,
-    fcp: 3000,
+    performance: { warn: 90, fail: 50 },
+    accessibility: { warn: 90, fail: 50 },
+    bestPractices: { warn: 90, fail: 50 },
+    seo: { warn: 90, fail: 50 },
+    lcp: { warn: 2500, fail: 4000 },
+    cls: { warn: 0.1, fail: 0.25 },
+    tbt: { warn: 200, fail: 600 },
+    fcp: { warn: 1800, fail: 3000 },
   },
 
   // Relative limits versus the baseline (median of the previous N runs of the same site).

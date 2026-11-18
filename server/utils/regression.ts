@@ -1,6 +1,7 @@
 import {
   SCORE_METRICS,
   TIMING_METRICS,
+  THRESHOLD_METRICS,
   METRIC_LABELS,
   type Metric,
   type Thresholds,
@@ -9,7 +10,8 @@ import {
   type AlertSeverity,
 } from '~~/shared/types/sentinel'
 import { median } from './psi'
-import { formatMetric } from '~~/shared/utils/format'
+import { formatMetric, isScoreMetric } from '~~/shared/utils/format'
+import { thresholdBreach } from '~~/shared/utils/thresholds'
 
 export type MetricValues = Partial<Record<Metric, number | null>>
 
@@ -23,38 +25,28 @@ export interface Finding {
   message: string
 }
 
-/** Absolute thresholds: scores must be >= min, timings must be <= max. */
+/**
+ * Absolute thresholds, two lines per metric (Google's colour bands): a score below / a timing
+ * above the `fail` line is a fail, otherwise crossing the `warn` line is a warn.
+ */
 export function checkThresholds(values: MetricValues, thresholds: Thresholds): Finding[] {
   const findings: Finding[] = []
-  for (const m of SCORE_METRICS) {
+  for (const m of THRESHOLD_METRICS) {
     const v = values[m]
-    const min = thresholds[m]
-    if (v != null && min != null && v < min) {
-      findings.push({
-        metric: m,
-        kind: 'threshold',
-        severity: v < min - 10 ? 'fail' : 'warn',
-        actual: v,
-        limit: min,
-        baseline: null,
-        message: `${METRIC_LABELS[m]} ${formatMetric(m, v)} is below the minimum of ${min}`,
-      })
-    }
-  }
-  for (const m of ['lcp', 'cls', 'tbt', 'fcp'] as const) {
-    const v = values[m]
-    const max = thresholds[m]
-    if (v != null && max != null && v > max) {
-      findings.push({
-        metric: m,
-        kind: 'threshold',
-        severity: v > max * 1.5 ? 'fail' : 'warn',
-        actual: v,
-        limit: max,
-        baseline: null,
-        message: `${METRIC_LABELS[m]} ${formatMetric(m, v)} exceeds the maximum of ${formatMetric(m, max)}`,
-      })
-    }
+    const line = thresholds[m]
+    if (v == null || line == null) continue
+    const severity = thresholdBreach(m, v, line)
+    if (!severity) continue
+    const limit = line[severity]
+    findings.push({
+      metric: m,
+      kind: 'threshold',
+      severity,
+      actual: v,
+      limit,
+      baseline: null,
+      message: `${METRIC_LABELS[m]} ${formatMetric(m, v)} is ${isScoreMetric(m) ? 'below' : 'above'} the ${severity} line of ${formatMetric(m, limit)}`,
+    })
   }
   return findings
 }

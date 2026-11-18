@@ -28,21 +28,24 @@ export interface PageConfig {
   /** Path relative to the site baseUrl (or an absolute URL). */
   path: string
   /** Optional per-page overrides of the site/global thresholds. */
-  thresholds?: Partial<Thresholds>
+  thresholds?: ThresholdOverrides
 }
 
-export interface Thresholds {
-  /** Minimum Lighthouse category scores (0-100). */
-  performance: number
-  accessibility: number
-  bestPractices: number
-  seo: number
-  /** Maximum Core Web Vitals / lab timings. Times in ms, CLS unitless. */
-  lcp: number
-  cls: number
-  tbt: number
-  fcp: number
+export type ThresholdMetric = ScoreMetric | 'lcp' | 'cls' | 'tbt' | 'fcp'
+export const THRESHOLD_METRICS: ThresholdMetric[] = [...SCORE_METRICS, 'lcp', 'cls', 'tbt', 'fcp']
+
+/**
+ * Two lines per metric, like Google's colour bands: `warn` is the green/orange boundary,
+ * `fail` the orange/red one. Scores (0-100) alert when *below* a line, timings (ms, CLS
+ * unitless) when *above* it.
+ */
+export interface ThresholdLine {
+  warn: number
+  fail: number
 }
+export type Thresholds = Record<ThresholdMetric, ThresholdLine>
+/** Site/page overrides: any metric, either line. */
+export type ThresholdOverrides = Partial<Record<ThresholdMetric, Partial<ThresholdLine>>>
 
 export interface RegressionRules {
   /** Number of previous completed runs used to compute the baseline (median). */
@@ -65,7 +68,7 @@ export interface SiteConfig {
   /** Pages monitored on every run of this site. */
   pages: PageConfig[]
   /** Optional per-site overrides of the global thresholds. */
-  thresholds?: Partial<Thresholds>
+  thresholds?: ThresholdOverrides
 }
 
 /** Shape of sentinel.sites.json. */

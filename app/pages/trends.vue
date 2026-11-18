@@ -1,6 +1,13 @@
 <script setup lang="ts">
+import { mergeThresholds } from '~~/shared/utils/thresholds'
 import type { PageResult } from '~~/server/db/schema'
-import { SCORE_METRICS, TIMING_METRICS, METRIC_LABELS, type Metric } from '~~/shared/types/sentinel'
+import {
+  SCORE_METRICS,
+  TIMING_METRICS,
+  METRIC_LABELS,
+  type Metric,
+  type ThresholdLine,
+} from '~~/shared/types/sentinel'
 
 interface TrendRun {
   id: number
@@ -51,8 +58,9 @@ const series = computed(() =>
 )
 
 const threshold = computed(() => {
-  const t = { ...config.value?.thresholds, ...site.value?.thresholds } as Record<string, number>
-  return t[metric.value] ?? null
+  if (!config.value) return null
+  const t = mergeThresholds(config.value.thresholds, site.value?.thresholds)
+  return (t as Partial<Record<string, ThresholdLine>>)[metric.value] ?? null
 })
 
 function togglePage(id: string) {

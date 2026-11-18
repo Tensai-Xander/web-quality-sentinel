@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import {
-  SCORE_METRICS,
+  THRESHOLD_METRICS,
   METRIC_LABELS,
   type Metric,
-  type Thresholds,
+  type ThresholdLine,
+  type ThresholdOverrides,
 } from '~~/shared/types/sentinel'
-import { formatMetric } from '~~/shared/utils/format'
+import { formatMetric, isScoreMetric } from '~~/shared/utils/format'
+import { mergeThresholds } from '~~/shared/utils/thresholds'
 import type { ClientSite, ClientPage } from '~/composables/useSentinel'
 
 interface Proposal {
@@ -23,8 +25,7 @@ interface SitemapResult {
 }
 
 const { config, refresh, siteId } = useSentinel()
-const timingThresholds = ['lcp', 'cls', 'tbt', 'fcp'] as const
-const thresholdKeys = [...SCORE_METRICS, ...timingThresholds] as (keyof Thresholds)[]
+const LEVELS = ['warn', 'fail'] as const
 
 const busy = ref(false)
 const errors = reactive<Record<string, string>>({})
@@ -53,36 +54,48 @@ async function call<T>(key: string, fn: () => Promise<T>): Promise<T | undefined
 }
 
 /* ---------- pages ---------- */
-type PageForm = { label: string; path: string; thresholds: Record<string, number | null> }
+type LineForm = Record<(typeof LEVELS)[number], number | null>
+type PageForm = { label: string; path: string; thresholds: Record<string, LineForm> }
 const pageEdit = reactive<Record<string, PageForm>>({}) // key: site/page
 const newPage = reactive<Record<string, { label: string; path: string }>>({})
 const confirmPage = reactive<Record<string, boolean>>({})
 const confirmSite = reactive<Record<string, boolean>>({})
 const deleteHistory = reactive<Record<string, boolean>>({})
 
-function emptyThresholds() {
-  return Object.fromEntries(thresholdKeys.map((k) => [k, null])) as Record<string, number | null>
+/** Lines a page inherits when it has no override of its own (global + site). */
+function siteLines(site: ClientSite) {
+  return mergeThresholds(config.value!.thresholds, site.thresholds)
 }
 function startPageEdit(site: ClientSite, p: ClientPage) {
-  pageEdit[`${site.id}/${p.id}`] = {
-    label: p.label,
-    path: p.path,
-    thresholds: { ...emptyThresholds(), ...pageOverrides(site, p) },
-  }
+  const overrides = pageOverrides(site, p)
+  const thresholds: Record<string, LineForm> = {}
+  for (const m of THRESHOLD_METRICS)
+    thresholds[m] = { warn: overrides[m]?.warn ?? null, fail: overrides[m]?.fail ?? null }
+  pageEdit[`${site.id}/${p.id}`] = { label: p.label, path: p.path, thresholds }
 }
-/** Per-page overrides = effective thresholds that differ from the site's defaults. */
-function pageOverrides(site: ClientSite, p: ClientPage) {
-  const base = { ...config.value!.thresholds, ...(site.thresholds ?? {}) }
-  const out: Record<string, number> = {}
-  for (const k of thresholdKeys) if (p.thresholds[k] !== base[k]) out[k] = p.thresholds[k]
+/** Per-page overrides = effective lines that differ from the site's. */
+function pageOverrides(site: ClientSite, p: ClientPage): ThresholdOverrides {
+  const base = siteLines(site)
+  const out: ThresholdOverrides = {}
+  for (const m of THRESHOLD_METRICS)
+    for (const level of LEVELS)
+      if (p.thresholds[m][level] !== base[m][level])
+        out[m] = { ...out[m], [level]: p.thresholds[m][level] }
   return out
+}
+/** "90 / 50", "2.50 s / 4.00 s": the warn line, then the fail line. */
+function formatLine(m: string, line: ThresholdLine) {
+  return `${formatMetric(m, line.warn)} / ${formatMetric(m, line.fail)}`
 }
 async function savePage(site: ClientSite, p: ClientPage) {
   const key = `${site.id}/${p.id}`
   const f = pageEdit[key]!
-  const thresholds = Object.fromEntries(
-    Object.entries(f.thresholds).filter(([, v]) => v != null && v !== ('' as unknown))
-  )
+  const thresholds: ThresholdOverrides = {}
+  for (const m of THRESHOLD_METRICS)
+    for (const level of LEVELS) {
+      const v = f.thresholds[m]![level]
+      if (v != null && v !== ('' as unknown)) thresholds[m] = { ...thresholds[m], [level]: v }
+    }
   const r = await call(key, () =>
     api(`/api/sites/${site.id}/pages/${p.id}`, {
       method: 'PATCH',
@@ -195,8 +208,8 @@ function alreadyHas(site: ClientSite, path: string) {
       <h1>Settings</h1>
       <p class="muted small">
         Sites and pages are stored in <code>{{ config.sitesFile }}</code> and can be edited below
-        (changes apply to the next run). Thresholds, regression rules and PSI options come from
-        <code>sentinel.config.ts</code>.
+        (changes apply to the next run). Default thresholds, regression rules and PSI options come
+        from <code>sentinel.config.ts</code>.
       </p>
       <p v-if="config.sitesError" class="small" style="color: var(--poor)">
         ⚠ {{ config.sitesError }}
@@ -378,8 +391,19 @@ function alreadyHas(site: ClientSite, path: string) {
         <thead>
           <tr>
             <th>Page</th>
-            <th v-for="m in SCORE_METRICS" :key="m" class="num">{{ METRIC_LABELS[m] }} ≥</th>
-            <th v-for="m in timingThresholds" :key="m" class="num">{{ METRIC_LABELS[m] }} ≤</th>
+            <th
+              v-for="m in THRESHOLD_METRICS"
+              :key="m"
+              class="num"
+              :title="
+                isScoreMetric(m)
+                  ? 'warn below the first value, fail below the second'
+                  : 'warn above the first value, fail above the second'
+              "
+            >
+              {{ METRIC_LABELS[m] }} {{ isScoreMetric(m) ? '≥' : '≤' }}
+              <div class="muted small" style="font-weight: normal">warn / fail</div>
+            </th>
             <th />
           </tr>
         </thead>
@@ -397,9 +421,8 @@ function alreadyHas(site: ClientSite, path: string) {
                 >
                 <div class="muted small" :title="p.url">{{ p.path }}</div>
               </td>
-              <td v-for="m in SCORE_METRICS" :key="m" class="num">{{ p.thresholds[m] }}</td>
-              <td v-for="m in timingThresholds" :key="m" class="num">
-                {{ formatMetric(m, p.thresholds[m]) }}
+              <td v-for="m in THRESHOLD_METRICS" :key="m" class="num" style="white-space: nowrap">
+                {{ formatLine(m, p.thresholds[m]) }}
               </td>
               <td class="num" style="white-space: nowrap">
                 <template v-if="confirmPage[`${s.id}/${p.id}`]">
@@ -445,15 +468,17 @@ function alreadyHas(site: ClientSite, path: string) {
                   id <code>{{ p.id }}</code> (history key, unchanged)
                 </div>
               </td>
-              <td v-for="m in thresholdKeys" :key="m" class="num">
+              <td v-for="m in THRESHOLD_METRICS" :key="m" class="num" style="white-space: nowrap">
                 <input
-                  v-model.number="pageEdit[`${s.id}/${p.id}`]!.thresholds[m]"
+                  v-for="level in LEVELS"
+                  :key="level"
+                  v-model.number="pageEdit[`${s.id}/${p.id}`]!.thresholds[m]![level]"
                   type="number"
                   :step="m === 'cls' ? 0.01 : 1"
                   min="0"
-                  :placeholder="String({ ...config.thresholds, ...(s.thresholds ?? {}) }[m])"
+                  :placeholder="String(siteLines(s)[m][level])"
                   class="threshold-input"
-                  :title="`Leave empty to use the default (${METRIC_LABELS[m]} ${formatMetric(m, { ...config.thresholds, ...(s.thresholds ?? {}) }[m])})`"
+                  :title="`${METRIC_LABELS[m]} ${level} line${m === 'cls' ? '' : isScoreMetric(m) ? ' (score)' : ' (ms)'} — leave empty to use the default (${formatMetric(m, siteLines(s)[m][level])})`"
                 />
               </td>
               <td class="num" style="white-space: nowrap">
@@ -465,7 +490,7 @@ function alreadyHas(site: ClientSite, path: string) {
             </tr>
             <tr v-if="errors[`${s.id}/${p.id}`]">
               <td
-                :colspan="thresholdKeys.length + 2"
+                :colspan="THRESHOLD_METRICS.length + 2"
                 class="small"
                 style="color: var(--poor); white-space: normal"
               >
@@ -474,7 +499,7 @@ function alreadyHas(site: ClientSite, path: string) {
             </tr>
           </template>
           <tr class="add-row">
-            <td :colspan="thresholdKeys.length + 2">
+            <td :colspan="THRESHOLD_METRICS.length + 2">
               <div class="row">
                 <span class="muted small">Add a page:</span>
                 <input
@@ -514,6 +539,11 @@ function alreadyHas(site: ClientSite, path: string) {
           </tr>
         </tbody>
       </table>
+      <p class="muted small" style="margin: 0.4rem 0 0">
+        Threshold lines (warn / fail), from Google's colour bands: scores alert when below a line,
+        timings when above it. Defaults come from <code>sentinel.config.ts</code>; a page's own
+        lines are set with Edit (empty = default).
+      </p>
     </section>
 
     <section class="card">

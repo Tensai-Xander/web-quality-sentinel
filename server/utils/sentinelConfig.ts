@@ -1,5 +1,6 @@
 import config from '~~/sentinel.config'
 import type { PageConfig, SiteConfig, Thresholds } from '~~/shared/types/sentinel'
+import { mergeThresholds } from '~~/shared/utils/thresholds'
 
 /** Global rules (sentinel.config.ts). Sites come from sentinel.sites.json via loadSites(). */
 export function useSentinelConfig() {
@@ -24,5 +25,5 @@ export function pageUrl(site: SiteConfig, page: PageConfig) {
 }
 
 export function thresholdsFor(site: SiteConfig, page: PageConfig): Thresholds {
-  return { ...config.thresholds, ...(site.thresholds ?? {}), ...(page.thresholds ?? {}) }
+  return mergeThresholds(config.thresholds, site.thresholds, page.thresholds)
 }

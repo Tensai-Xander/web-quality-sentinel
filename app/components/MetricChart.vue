@@ -11,6 +11,7 @@ import {
   Filler,
 } from 'chart.js'
 import { formatMetric, isScoreMetric } from '~~/shared/utils/format'
+import type { ThresholdLine } from '~~/shared/types/sentinel'
 
 Chart.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend, Filler)
 
@@ -18,7 +19,8 @@ const props = defineProps<{
   metric: string
   labels: string[]
   series: { label: string; data: (number | null)[] }[]
-  threshold?: number | null
+  /** warn / fail lines drawn as dashed orange / red lines. */
+  threshold?: ThresholdLine | null
 }>()
 
 const palette = [
@@ -44,17 +46,15 @@ const chartData = computed(() => ({
       spanGaps: true,
       pointRadius: 3,
     })),
-    ...(props.threshold != null
-      ? [
-          {
-            label: isScoreMetric(props.metric) ? 'Minimum' : 'Maximum',
-            data: props.labels.map(() => props.threshold as number),
-            borderColor: '#d93025',
-            borderDash: [6, 4],
-            pointRadius: 0,
-            borderWidth: 1,
-          },
-        ]
+    ...(props.threshold
+      ? (['warn', 'fail'] as const).map((level) => ({
+          label: `${level} line`,
+          data: props.labels.map(() => props.threshold![level]),
+          borderColor: level === 'fail' ? '#d93025' : '#f29900',
+          borderDash: [6, 4],
+          pointRadius: 0,
+          borderWidth: 1,
+        }))
       : []),
   ],
 }))

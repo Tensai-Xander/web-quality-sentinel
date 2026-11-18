@@ -101,34 +101,39 @@ Sites and pages are in [`sentinel.sites.json`](./sentinel.sites.json) (written b
 page and by `pnpm sentinel:init`; it is plain JSON, so it can also be edited by hand and shared
 through git). The global rules live in [`sentinel.config.ts`](./sentinel.config.ts):
 
-| Key          | What it does                                                                                                                                                                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sites`      | _(in `sentinel.sites.json`)_ `id` (stored with every run — keep it stable), `name`, `baseUrl`, `pages`, optional `thresholds` overrides. The first site is selected by default in the dashboard.                                                                                |
-| `pages`      | _(per site, in `sentinel.sites.json`)_ `id` (stable key of the page's history), `label`, `path` (appended to `baseUrl`), optional per-page `thresholds`. Editable in Settings.                                                                                                  |
-| `strategies` | `['mobile', 'desktop']` — remove one to halve the number of PSI requests.                                                                                                                                                                                                       |
-| `psi`        | `samples` (median is stored), `delayMs` between requests, Lighthouse `categories`.                                                                                                                                                                                              |
-| `thresholds` | Absolute limits: minimum scores (0–100) and maximum LCP/CLS/TBT/FCP. Defaults are Lighthouse's red ("poor") boundaries. Breaches raise _threshold_ alerts. Pages that are not indexable (`noindex`, detected via the Lighthouse `is-crawlable` audit) are never alerted on SEO. |
-| `regression` | Relative limits vs. the baseline (median of the previous `baselineRuns` completed runs).                                                                                                                                                                                        |
+| Key          | What it does                                                                                                                                                                                                                                                                                                                                              |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sites`      | _(in `sentinel.sites.json`)_ `id` (stored with every run — keep it stable), `name`, `baseUrl`, `pages`, optional `thresholds` overrides. The first site is selected by default in the dashboard.                                                                                                                                                          |
+| `pages`      | _(per site, in `sentinel.sites.json`)_ `id` (stable key of the page's history), `label`, `path` (appended to `baseUrl`), optional per-page `thresholds`. Editable in Settings.                                                                                                                                                                            |
+| `strategies` | `['mobile', 'desktop']` — remove one to halve the number of PSI requests.                                                                                                                                                                                                                                                                                 |
+| `psi`        | `samples` (median is stored), `delayMs` between requests, Lighthouse `categories`.                                                                                                                                                                                                                                                                        |
+| `thresholds` | Absolute limits, two lines per metric `{ warn, fail }` for the scores (0–100, alert when below) and LCP/CLS/TBT/FCP (alert when above). Defaults are Google's colour-band boundaries (see below). Breaches raise _threshold_ alerts. Pages that are not indexable (`noindex`, detected via the Lighthouse `is-crawlable` audit) are never alerted on SEO. |
+| `regression` | Relative limits vs. the baseline (median of the previous `baselineRuns` completed runs).                                                                                                                                                                                                                                                                  |
 
 ### Where the default thresholds come from
 
-The default limits are Google's own "poor" (red) lines, so an alert means "Google would show
-this metric in red" — not the "good" (green) lines, which these sites do not reach yet and would
-alert on every run.
+Each metric has two lines, matching the colours Google uses: the `warn` line is the green → orange
+("good" → "needs improvement") boundary and the `fail` line the orange → red ("poor") boundary.
+So a `warn` alert means "Google shows this metric in orange", a `fail` alert "in red", and the
+alerts always agree with the colours of the badges in the dashboard.
 
-| Metric                   | Google: good | Google: poor | Default limit  | Source                                                                                                         |
-| ------------------------ | ------------ | ------------ | -------------- | -------------------------------------------------------------------------------------------------------------- |
-| Performance score        | 90–100       | 0–49         | ≥ 50           | [Lighthouse performance scoring](https://developer.chrome.com/docs/lighthouse/performance/performance-scoring) |
-| LCP (Core Web Vital)     | ≤ 2.5 s      | > 4 s        | ≤ 4 s          | [web.dev/lcp](https://web.dev/articles/lcp)                                                                    |
-| CLS (Core Web Vital)     | ≤ 0.1        | > 0.25       | ≤ 0.25         | [web.dev/cls](https://web.dev/articles/cls)                                                                    |
-| TBT (lab proxy for INP)  | ≤ 200 ms     | > 600 ms     | ≤ 600 ms       | [web.dev/tbt](https://web.dev/articles/tbt)                                                                    |
-| FCP                      | ≤ 1.8 s      | > 3 s        | ≤ 3 s          | [web.dev/fcp](https://web.dev/articles/fcp)                                                                    |
-| Accessibility / BP / SEO | 90–100       | 0–49         | ≥ 90 / 80 / 90 | project choice ("stay green"), not a Google line                                                               |
+| Metric                              | Google: good (green) | Needs improvement (orange) | Poor (red) | Default `warn` / `fail` | Source                                                                                                         |
+| ----------------------------------- | -------------------- | -------------------------- | ---------- | ----------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Performance, Accessibility, BP, SEO | 90–100               | 50–89                      | 0–49       | < 90 / < 50             | [Lighthouse performance scoring](https://developer.chrome.com/docs/lighthouse/performance/performance-scoring) |
+| LCP (Core Web Vital)                | ≤ 2.5 s              | 2.5–4 s                    | > 4 s      | > 2.5 s / > 4 s         | [web.dev/lcp](https://web.dev/articles/lcp)                                                                    |
+| CLS (Core Web Vital)                | ≤ 0.1                | 0.1–0.25                   | > 0.25     | > 0.1 / > 0.25          | [web.dev/cls](https://web.dev/articles/cls)                                                                    |
+| TBT (lab proxy for INP)             | ≤ 200 ms             | 200–600 ms                 | > 600 ms   | > 200 ms / > 600 ms     | [web.dev/tbt](https://web.dev/articles/tbt)                                                                    |
+| FCP                                 | ≤ 1.8 s              | 1.8–3 s                    | > 3 s      | > 1.8 s / > 3 s         | [web.dev/fcp](https://web.dev/articles/fcp)                                                                    |
 
-Core Web Vitals (LCP, INP, CLS) are what Google's ranking signal uses, assessed on real users at
-the 75th percentile — the "Real users" section shows those field values; the thresholds above are
-applied to the lab (Lighthouse) values of each run. Change the limits in `sentinel.config.ts`, or
-per site / page in Settings.
+LCP and CLS are Core Web Vitals: Google states these lines officially, assessed on real users at
+the 75th percentile, the same for mobile and desktop — the "Real users" section shows those field
+values. TBT and FCP are lab-only metrics; their lines are the ones Lighthouse uses to colour them
+(mobile). The thresholds are applied to the lab (Lighthouse) values of each run. Lighthouse
+colours desktop runs with stricter internal bands (e.g. LCP 1.2 s / 2.4 s); the tool keeps the
+single official set above for both devices, as PSI's own report does. Change the lines in
+`sentinel.config.ts`, or per site / page in Settings (Edit → two inputs per metric, empty =
+default). A site or page override may set only one of the two lines, e.g.
+`"thresholds": { "performance": { "warn": 70 } }`.
 
 Restart the dev server after editing `sentinel.config.ts` (`sentinel.sites.json` is re-read automatically). Environment variables (`.env`):
 
@@ -193,8 +198,8 @@ users OK?", while the lab metrics answer "did the last release change something?
    "This URL" field data); the following ones add a throw-away `?sentinel=<id>` query parameter,
    which makes Google run a fresh Lighthouse analysis of the same page. The run page's "Samples"
    table shows the analysis time of each sample.
-2. **Thresholds** – each stored value is compared with the absolute limits (`thresholds`, or the
-   site/page override). Any breach raises a _threshold_ alert.
+2. **Thresholds** – each stored value is compared with the two absolute lines of its metric
+   (`thresholds`, or the site/page override). Crossing a line raises a _threshold_ alert.
 3. **Baseline** – the median of the same page × device × metric over the previous
    `regression.baselineRuns` completed runs (at least 2 runs are required, so the first two runs
    never produce regression alerts).
@@ -204,18 +209,16 @@ users OK?", while the lab metrics answer "did the last release change something?
 
 ### Alert severity (`warn` / `fail`)
 
-The severity only depends on how far the value is from the limit:
+| Alert                              | `warn`                                 | `fail`                                     |
+| ---------------------------------- | -------------------------------------- | ------------------------------------------ |
+| Threshold, score (perf, a11y, …)   | below the `warn` line (default 90)     | below the `fail` line (default 50)         |
+| Threshold, timing (LCP, CLS, TBT…) | above the `warn` line (e.g. LCP 2.5 s) | above the `fail` line (e.g. LCP 4 s)       |
+| Regression, score                  | drop ≥ `scoreDrop` (10 pts)            | drop ≥ 2 × `scoreDrop` (20 pts)            |
+| Regression, timing                 | increase ≥ `timingIncreasePct` (50 %)  | increase ≥ 2 × `timingIncreasePct` (100 %) |
 
-| Alert                              | `warn`                                | `fail`                                     |
-| ---------------------------------- | ------------------------------------- | ------------------------------------------ |
-| Threshold, score (perf, a11y, …)   | below the minimum                     | more than 10 points below the minimum      |
-| Threshold, timing (LCP, CLS, TBT…) | over the maximum                      | over 1.5 × the maximum                     |
-| Regression, score                  | drop ≥ `scoreDrop` (10 pts)           | drop ≥ 2 × `scoreDrop` (20 pts)            |
-| Regression, timing                 | increase ≥ `timingIncreasePct` (50 %) | increase ≥ 2 × `timingIncreasePct` (100 %) |
-
-Example with the default `performance: 50`: a score of 42 is a `warn`, 38 (more than 10 points
-under) is a `fail`. Quality alerts (browser checks) have their own rule: HTTP errors, broken links
-and critical/serious axe violations are `fail`, everything else is `warn`.
+Example with the default performance lines 90 / 50: a score of 72 (orange) is a `warn`, 38 (red)
+is a `fail`, 93 (green) raises nothing. Quality alerts (browser checks) have their own rule: HTTP
+errors, broken links and critical/serious axe violations are `fail`, everything else is `warn`.
 
 ## Triggering a run from a release pipeline
 

@@ -1,19 +1,18 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import type { PageConfig, SiteConfig, SitesFile, Thresholds } from '~~/shared/types/sentinel'
+import {
+  SCORE_METRICS,
+  THRESHOLD_METRICS,
+  type PageConfig,
+  type SiteConfig,
+  type SitesFile,
+  type ThresholdLine,
+  type ThresholdMetric,
+  type ThresholdOverrides,
+} from '~~/shared/types/sentinel'
 
 export const SITES_FILE = 'sentinel.sites.json'
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
-const THRESHOLD_KEYS: (keyof Thresholds)[] = [
-  'performance',
-  'accessibility',
-  'bestPractices',
-  'seo',
-  'lcp',
-  'cls',
-  'tbt',
-  'fcp',
-]
 
 function sitesPath() {
   return resolve(process.cwd(), SITES_FILE)
@@ -60,16 +59,32 @@ function bad(message: string): never {
   throw createError({ statusCode: 400, statusMessage: message })
 }
 
-export function validateThresholds(input: unknown): Partial<Thresholds> | undefined {
+/** `{ metric: { warn?, fail? } }`; empty values are dropped. Scores need warn ≥ fail, timings warn ≤ fail. */
+export function validateThresholds(input: unknown): ThresholdOverrides | undefined {
   if (input == null) return undefined
   if (typeof input !== 'object') bad('thresholds must be an object')
-  const out: Partial<Thresholds> = {}
+  const out: ThresholdOverrides = {}
   for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
-    if (!THRESHOLD_KEYS.includes(k as keyof Thresholds)) bad(`Unknown threshold "${k}"`)
-    if (v == null || v === '') continue
-    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0)
-      bad(`Threshold "${k}" must be a number`)
-    out[k as keyof Thresholds] = v
+    const metric = k as ThresholdMetric
+    if (!THRESHOLD_METRICS.includes(metric)) bad(`Unknown threshold "${k}"`)
+    if (v == null) continue
+    if (typeof v !== 'object') bad(`Threshold "${k}" must be an object { warn, fail }`)
+    const line: Partial<ThresholdLine> = {}
+    for (const level of ['warn', 'fail'] as const) {
+      const n = (v as Record<string, unknown>)[level]
+      if (n == null || n === '') continue
+      if (typeof n !== 'number' || !Number.isFinite(n) || n < 0)
+        bad(`Threshold "${k}.${level}" must be a number`)
+      line[level] = n
+    }
+    if (line.warn != null && line.fail != null) {
+      const isScore = (SCORE_METRICS as string[]).includes(metric)
+      if (isScore ? line.warn < line.fail : line.warn > line.fail)
+        bad(
+          `Threshold "${k}": the warn line must be ${isScore ? 'higher' : 'lower'} than the fail line`
+        )
+    }
+    if (Object.keys(line).length) out[metric] = line
   }
   return Object.keys(out).length ? out : undefined
 }
