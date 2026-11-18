@@ -8,6 +8,13 @@ const props = defineProps<{
   only?: QualityMetric | null
 }>()
 const show = (...metrics: QualityMetric[]) => !props.only || metrics.includes(props.only)
+/** Live page scrolled to and highlighting `text` (Chrome/Edge/Safari text fragment). */
+function openInPage(text: string | undefined) {
+  if (!text) return null
+  let t = text.trim()
+  if (t.length > 80) t = t.slice(0, 80).replace(/\s+\S*$/, '')
+  return `${props.details.finalUrl.split('#')[0]}#:~:text=${encodeURIComponent(t)}`
+}
 const META_KEYS = [
   'title',
   'description',
@@ -49,7 +56,26 @@ const META_KEYS = [
             </tr>
             <tr>
               <th>h1</th>
-              <td>{{ details.meta.h1Count }}</td>
+              <td style="white-space: normal">
+                {{ details.meta.h1Count }}
+                <ol
+                  v-if="details.meta.h1s?.length"
+                  style="margin: 0.2rem 0 0; padding-left: 1.3rem"
+                >
+                  <li v-for="(h, i) in details.meta.h1s" :key="i">
+                    "{{ h || '(empty)' }}"
+                    <a
+                      v-if="openInPage(h)"
+                      :href="openInPage(h)!"
+                      target="_blank"
+                      rel="noopener"
+                      class="muted"
+                      @click.stop
+                      >open in page</a
+                    >
+                  </li>
+                </ol>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -92,6 +118,16 @@ const META_KEYS = [
               <a :href="l.url" target="_blank" rel="noopener" @click.stop>{{ l.url }}</a>
               <span class="pill fail" style="margin-left: 0.3em">{{ l.status ?? l.error }}</span>
               <span v-if="l.text" class="muted"> — "{{ l.text }}"</span>
+              <a
+                v-if="openInPage(l.text)"
+                :href="openInPage(l.text)!"
+                target="_blank"
+                rel="noopener"
+                class="muted"
+                style="margin-left: 0.4em"
+                @click.stop
+                >open in page</a
+              >
             </li>
           </ul>
           <div v-else class="muted">None.</div>
@@ -130,7 +166,7 @@ const META_KEYS = [
             <th>Rule</th>
             <th class="num">Elements</th>
             <th>WCAG</th>
-            <th>Examples</th>
+            <th>Affected elements</th>
           </tr>
         </thead>
         <tbody>
@@ -152,9 +188,28 @@ const META_KEYS = [
             <td style="white-space: normal">
               {{ v.tags.filter((t) => t.startsWith('wcag')).join(', ') || 'best practice' }}
             </td>
-            <td style="white-space: normal; max-width: 32rem">
-              <div v-for="n in v.samples" :key="n.target" class="muted">
-                <code :title="n.html">{{ n.target }}</code>
+            <td style="white-space: normal; max-width: 36rem">
+              <div v-for="n in v.samples" :key="n.target" class="a11y-node">
+                <div v-if="n.text">
+                  "{{ n.text }}"
+                  <a
+                    :href="openInPage(n.text)!"
+                    target="_blank"
+                    rel="noopener"
+                    class="muted"
+                    style="margin-left: 0.4em"
+                    @click.stop
+                    >open in page</a
+                  >
+                </div>
+                <code class="a11y-html">{{ n.html }}</code>
+                <div v-if="n.reason" class="muted">{{ n.reason }}</div>
+                <div class="muted" :title="n.target">
+                  selector: <code>{{ n.target }}</code>
+                </div>
+              </div>
+              <div v-if="v.nodes > v.samples.length" class="muted">
+                … and {{ v.nodes - v.samples.length }} more element(s)
               </div>
             </td>
           </tr>

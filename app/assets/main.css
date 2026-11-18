@@ -322,6 +322,22 @@ select {
 .issue-toggle.open {
   color: var(--accent);
 }
+.a11y-node {
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #eef0f2;
+}
+.a11y-node:last-of-type {
+  border-bottom: 0;
+}
+.a11y-html {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #f3f4f6;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+  margin: 0.15rem 0;
+}
 .issue-detail {
   margin: 0.4rem 0 0.6rem;
   padding: 0.5rem 0.75rem;

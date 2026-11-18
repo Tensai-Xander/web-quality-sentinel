@@ -48,6 +48,8 @@ export interface MetaInfo {
   ogDescription: string | null
   ogImage: string | null
   h1Count: number
+  /** Text of each <h1> (absent on runs made before it was stored). */
+  h1s?: string[]
   issues: string[]
 }
 export interface JsonLdInfo {
@@ -66,8 +68,8 @@ export interface A11yViolation {
   tags: string[]
   /** Number of affected elements. */
   nodes: number
-  /** First elements: CSS selector and HTML snippet. */
-  samples: { target: string; html: string }[]
+  /** First elements: CSS selector, HTML snippet, visible text and axe's reason (text/reason absent on old runs). */
+  samples: { target: string; html: string; text?: string; reason?: string }[]
 }
 export interface A11yInfo {
   /** Rules that failed (axe-core violations). */
@@ -129,9 +131,16 @@ export async function crawlPage(
   const origin = new URL(url).origin
 
   page.on('console', (m) => {
-    if (m.type() === 'error') consoleErrors.push(trim(m.text()))
+    if (m.type() !== 'error') return
+    const { url: src, lineNumber } = m.location()
+    consoleErrors.push(trim(src ? `${m.text()} — ${src}:${lineNumber + 1}` : m.text()))
   })
-  page.on('pageerror', (e) => pageErrors.push(trim(e.message)))
+  page.on('pageerror', (e) => {
+    // first stack frame with a URL, e.g. "at fn (https://site/app.js:12:34)" or "at https://site/app.js:12:34"
+    const frame = e.stack?.match(/\((https?:\/\/[^)\s]+)\)|at (https?:\/\/\S+)/)
+    const src = frame?.[1] ?? frame?.[2]
+    pageErrors.push(trim(src ? `${e.message} — ${src}` : e.message))
+  })
   page.on('requestfailed', (r) => {
     // aborted requests (navigation, ad blockers) are noise; keep genuine network failures
     const err = r.failure()?.errorText ?? 'failed'
@@ -170,6 +179,9 @@ export async function crawlPage(
         ogDescription: content('meta[property="og:description"]'),
         ogImage: content('meta[property="og:image"]'),
         h1Count: document.querySelectorAll('h1').length,
+        h1s: [...document.querySelectorAll('h1')]
+          .slice(0, 20)
+          .map((h) => (h.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 120)),
         scripts,
         links,
       }
@@ -287,7 +299,7 @@ function checkJsonLd(scripts: string[]): JsonLdInfo {
 }
 
 const A11Y_MAX_RULES = 30
-const A11Y_MAX_SAMPLES = 5
+const A11Y_MAX_SAMPLES = 20
 const IMPACT_ORDER: Record<A11yImpact, number> = { critical: 0, serious: 1, moderate: 2, minor: 3 }
 
 // Read axe's browser bundle from disk instead of importing it: bundling it into the server
@@ -307,6 +319,7 @@ async function checkA11y(page: import('playwright').Page): Promise<A11yInfo> {
     // default rule set: WCAG 2.x A/AA + axe best practices (experimental rules are off by default)
     const raw = (await page.evaluate(`window.axe.run(document, {
       resultTypes: ['violations'],
+      elementRef: true,
     }).then((r) => ({
       passes: r.passes.length,
       violations: r.violations.map((v) => ({
@@ -319,6 +332,8 @@ async function checkA11y(page: import('playwright').Page): Promise<A11yInfo> {
         samples: v.nodes.slice(0, ${A11Y_MAX_SAMPLES}).map((n) => ({
           target: n.target.join(' '),
           html: n.html,
+          text: n.element ? (n.element.innerText || n.element.textContent || '') : '',
+          reason: n.failureSummary || '',
         })),
       })),
     }))`)) as { passes: number; violations: A11yViolation[] }
@@ -328,7 +343,12 @@ async function checkA11y(page: import('playwright').Page): Promise<A11yInfo> {
         ...v,
         helpUrl: v.helpUrl.split('?')[0]!,
         tags: v.tags.filter((t) => /^(wcag|best-practice)/.test(t)),
-        samples: v.samples.map((n) => ({ target: n.target.slice(0, 200), html: trim(n.html) })),
+        samples: v.samples.map((n) => ({
+          target: n.target.slice(0, 200),
+          html: trim(n.html),
+          text: (n.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 120),
+          reason: (n.reason ?? '').replace(/\s+/g, ' ').trim().slice(0, 300),
+        })),
       }))
       .sort((a, b) => IMPACT_ORDER[a.impact] - IMPACT_ORDER[b.impact] || b.nodes - a.nodes)
       .slice(0, A11Y_MAX_RULES)

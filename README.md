@@ -142,7 +142,8 @@ After the PSI samples of a page, the runner opens it in headless Chromium once p
 - accessibility: an [axe-core](https://github.com/dequelabs/axe-core) audit of the rendered page
   (WCAG 2.x A/AA rules + axe best practices). Each failed rule is stored with its impact
   (critical / serious / moderate / minor), WCAG tags, help link, number of affected elements and
-  the first 5 elements (selector + HTML). Lighthouse's accessibility _score_ comes from PSI; this
+  up to 20 affected elements (visible text, HTML snippet, CSS selector, axe's reason) with an
+  "Open in page" link that highlights the element's text on the live page. Lighthouse's accessibility _score_ comes from PSI; this
   audit gives the list of concrete problems behind it, on the real mobile and desktop rendering.
 
 Each finding raises a _quality_ alert (`fail` for HTTP errors, broken links and critical/serious
