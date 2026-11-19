@@ -24,8 +24,8 @@ export default defineEventHandler((event) => {
   if (!sameOrigin || (fetchSite && !['same-origin', 'none'].includes(fetchSite)))
     throw createError({ statusCode: 403, statusMessage: 'Cross-site request refused' })
   if (event.method !== 'DELETE') {
-    const type = getHeader(event, 'content-type') ?? ''
-    if (!type.startsWith('application/json'))
+    const type = (getHeader(event, 'content-type') ?? '').split(';')[0]!.trim().toLowerCase()
+    if (type !== 'application/json')
       throw createError({ statusCode: 415, statusMessage: 'application/json body required' })
   }
 })

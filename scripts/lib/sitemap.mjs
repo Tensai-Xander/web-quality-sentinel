@@ -9,20 +9,31 @@ export const CALLS_PER_PAGE = 6 // 3 samples × 2 strategies
 
 const PARAM_LIKE = /^(\d+|[0-9a-f]{8}-[0-9a-f-]{27,}|[0-9a-f]{16,})$/i
 
-async function fetchText(url) {
-  if (!/^https?:$/.test(new URL(url).protocol)) throw new Error(`${url}: not an http(s) URL`)
-  const res = await fetch(url, {
-    headers: { 'user-agent': 'web-quality-sentinel/init' },
-    signal: AbortSignal.timeout(20000),
-  })
-  if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`)
-  return res.text()
+/** GET on the site's origin only; redirects are followed by hand so each hop is checked too. */
+async function fetchText(url, origin) {
+  for (let hop = 0; hop < 5; hop++) {
+    if (!sameOrigin(url, origin)) throw new Error(`${url}: outside ${origin}`)
+    const res = await fetch(url, {
+      headers: { 'user-agent': 'web-quality-sentinel/init' },
+      signal: AbortSignal.timeout(20000),
+      redirect: 'manual',
+    })
+    const location = res.headers.get('location')
+    if (res.status >= 300 && res.status < 400 && location) {
+      url = new URL(location, url).href
+      continue
+    }
+    if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`)
+    return res.text()
+  }
+  throw new Error(`${url}: too many redirects`)
 }
 
 /** Sitemap fetches never leave the site being configured (no redirecting the server elsewhere). */
 function sameOrigin(url, origin) {
   try {
-    return new URL(url).origin === origin
+    const u = new URL(url)
+    return /^https?:$/.test(u.protocol) && u.origin === origin
   } catch {
     return false
   }
@@ -40,7 +51,7 @@ function tag(block, name) {
 
 async function discoverSitemaps(origin) {
   try {
-    const robots = await fetchText(`${origin}/robots.txt`)
+    const robots = await fetchText(`${origin}/robots.txt`, origin)
     const found = [...robots.matchAll(/^\s*sitemap:\s*(\S+)/gim)]
       .map((m) => m[1])
       .filter((u) => sameOrigin(u, origin))
@@ -58,13 +69,9 @@ async function collectUrls(origin, sitemapUrls, warn) {
   while (queue.length && visited < MAX_SITEMAPS) {
     const url = queue.shift()
     visited++
-    if (!sameOrigin(url, origin)) {
-      warn(`skip ${url}: outside ${origin}`)
-      continue
-    }
     let xml
     try {
-      xml = await fetchText(url)
+      xml = await fetchText(url, origin)
     } catch (e) {
       warn(`skip ${e.message}`)
       continue

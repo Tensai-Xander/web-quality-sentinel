@@ -12,7 +12,9 @@ export default defineEventHandler(async (event) => {
   assertSiteIdle(siteId)
   if (body.pages != null && !Array.isArray(body.pages))
     throw createError({ statusCode: 400, statusMessage: '"pages" must be an array' })
-  const inputs = (body.pages ?? [body]).filter((p) => p != null && typeof p === 'object')
+  const inputs = body.pages ?? [body]
+  if (inputs.some((p) => p == null || typeof p !== 'object' || Array.isArray(p)))
+    throw createError({ statusCode: 400, statusMessage: 'every page must be an object' })
   const taken = site.pages.map((p) => p.id)
   const added: PageConfig[] = []
   for (const input of inputs) {

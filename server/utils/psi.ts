@@ -187,8 +187,8 @@ export function parsePsiResponse(data: Json): PsiSample {
     throw new PsiError(
       `Lighthouse ${lhr.runtimeError.code}: ${String(lhr.runtimeError.message ?? '').slice(0, 200)}`
     )
-  if (typeof lhr?.categories?.performance?.score !== 'number')
-    throw new PsiError('PSI answered without a performance score (no Lighthouse result)')
+  if (!lhr?.categories || !Object.keys(lhr.categories).length)
+    throw new PsiError('PSI answered without any Lighthouse category (no result)')
   const field = fieldData(data.loadingExperience)
   const perfRefs: Json[] = lhr?.categories?.performance?.auditRefs ?? []
   const opportunities = perfRefs

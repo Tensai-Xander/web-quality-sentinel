@@ -39,8 +39,10 @@ export function loadSites(): SiteConfig[] {
   if (cache && cache.mtimeMs === mtimeMs) return structuredClone(cache.sites)
   if (failed && failed.mtimeMs === mtimeMs) return structuredClone(cache?.sites ?? [])
   try {
-    const parsed = JSON.parse(readFileSync(file, 'utf8')) as SitesFile
-    const sites = validateSites(parsed?.sites ?? [])
+    const parsed = JSON.parse(readFileSync(file, 'utf8')) as Partial<SitesFile> | null
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.sites))
+      throw new Error('expected { "sites": [ … ] }')
+    const sites = validateSites(parsed.sites)
     cache = { mtimeMs, sites }
     failed = null
     return structuredClone(sites)

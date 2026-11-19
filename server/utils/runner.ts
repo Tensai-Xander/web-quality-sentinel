@@ -83,12 +83,12 @@ export function rerunPages(runId: number, pageIds: string[]): { runId: number; s
       .run()
   })
   activeRun = { id: runId, siteId: site.id }
-  launch(runId, site, ids, { status: run.status, error: run.error })
+  launch(runId, site, ids, { status: run.status, error: run.error, checksTotal: run.checksTotal })
   return { runId, started: true }
 }
 
 /** Status a run had before a re-run; a `failed` run only becomes `completed` once every page has a row. */
-type PreviousStatus = { status: string; error: string | null } | null
+type PreviousStatus = { status: string; error: string | null; checksTotal: number } | null
 
 function launch(
   runId: number,
@@ -185,12 +185,8 @@ async function processRun(
     if (!fatal && !measured) {
       status = 'failed'
       error = 'No page could be measured (site or network down?)'
-    } else if (
-      !fatal &&
-      previous?.status === 'failed' &&
-      rows < site.pages.length * config.strategies.length
-    ) {
-      // partial re-run of an aborted run: it is still missing pages
+    } else if (!fatal && previous?.status === 'failed' && rows < previous.checksTotal) {
+      // partial re-run of an aborted run: pages of its original scope are still missing
       status = 'failed'
       error = previous.error
     }
@@ -199,8 +195,8 @@ async function processRun(
       .where(eq(schema.runs.id, runId))
       .run()
   } finally {
-    activeRun = null
     await closeCrawler()
+    activeRun = null
   }
 }
 

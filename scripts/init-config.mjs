@@ -57,7 +57,8 @@ try {
   // only a missing file starts a new one; a broken file must be fixed by hand, never overwritten
   if (e.code !== 'ENOENT') throw new Error(`${SITES_PATH} is invalid: ${e.message}`, { cause: e })
 }
-if (!Array.isArray(file.sites)) file.sites = []
+if (!file || typeof file !== 'object' || !Array.isArray(file.sites))
+  throw new Error(`${SITES_PATH} is invalid: expected { "sites": [ … ] }`)
 const idx = file.sites.findIndex((s) => s.id === site.id)
 if (idx >= 0 && !force) {
   console.log(
