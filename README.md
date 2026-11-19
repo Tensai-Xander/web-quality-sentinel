@@ -77,8 +77,9 @@ pnpm dev                     # http://localhost:3000
 
 Pick the site in the top-bar selector and click **Run now**: it measures every page of that site
 (one run at a time, whatever the site). A page whose measurement failed (e.g. `fetch failed`)
-shows a **re-run this page** link next to the error on the run page: it starts a new run
-containing only that page, both devices, and opens it (hidden while a run is in progress). A run of 8 pages × 2 devices × 3 samples takes roughly 10
+shows a **re-run this page** link next to the error on the run page: the page is measured again
+(both devices + browser checks) inside the same run, replacing its failed rows and alerts; the
+run shows `running` meanwhile. The link is hidden while a run is in progress. A run of 8 pages × 2 devices × 3 samples takes roughly 10
 minutes because PSI is slow and requests are spaced out to respect the quota; the overview page
 refreshes itself while a run is in progress. Results are stored in `.data/sentinel.db` on the
 machine that runs the app, so each installation has its own history. Regression alerts appear from
@@ -256,6 +257,7 @@ run list and on the trend charts, which makes release-to-release comparison easy
 | `GET`    | `/api/config`                  | Effective configuration, sites and pages (+ whether a key is set) |
 | `GET`    | `/api/runs?site=&limit=`       | Run list with alert counts (`site` optional: all sites if absent) |
 | `POST`   | `/api/runs`                    | Start a run (`siteId`, `trigger`, `releaseTag`, `pageIds`)        |
+| `POST`   | `/api/runs/:id/rerun`          | Measure some pages of that run again in place (`pageIds`)         |
 | `GET`    | `/api/runs/:id`                | Run with page results (incl. samples) and alerts                  |
 | `DELETE` | `/api/runs/:id`                | Delete a run and its data                                         |
 | `GET`    | `/api/trends?site=&strategy=`  | Metric history per page of one site for the trend charts          |

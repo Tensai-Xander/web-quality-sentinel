@@ -49,22 +49,55 @@ export function startRun(opts: StartOptions): { runId: number; started: boolean 
     .get()
   activeRun = { id: run.id, siteId: site.id }
 
-  processRun(
+  launch(
     run.id,
     site,
     pages.map((p) => p.id)
-  ).catch((err) => {
+  )
+  return { runId: run.id, started: true }
+}
+
+/**
+ * Measures some pages of an existing run again, in place: their results, checks and alerts are
+ * replaced and the run goes back to `running` meanwhile. Used to redo a page whose PSI request
+ * failed without creating a new (partial) run.
+ */
+export function rerunPages(runId: number, pageIds: string[]): { runId: number; started: boolean } {
+  const db = useDb()
+  const run = db.select().from(schema.runs).where(eq(schema.runs.id, runId)).get()
+  if (!run) throw createError({ statusCode: 404, statusMessage: 'Run not found' })
+  const site = getSite(run.siteId)
+  const pages = site.pages.filter((p) => pageIds.includes(p.id))
+  if (!pages.length) throw createError({ statusCode: 400, statusMessage: 'Unknown page ids' })
+  if (activeRun) return { runId: activeRun.id, started: false }
+
+  const ids = pages.map((p) => p.id)
+  for (const table of [schema.alerts, schema.pageChecks, schema.pageResults])
+    db.delete(table)
+      .where(and(eq(table.runId, runId), inArray(table.pageId, ids)))
+      .run()
+  db.update(schema.runs)
+    .set({ status: 'running', error: null, finishedAt: null, checksDone: countDone(runId) })
+    .where(eq(schema.runs.id, runId))
+    .run()
+  activeRun = { id: runId, siteId: site.id }
+  launch(runId, site, ids)
+  return { runId, started: true }
+}
+
+function launch(runId: number, site: SiteConfig, pageIds: string[]) {
+  processRun(runId, site, pageIds).catch((err) => {
     console.error('[sentinel] run failed', err)
-    db.update(schema.runs)
+    useDb()
+      .update(schema.runs)
       .set({
         status: 'failed',
         error: String(err?.message ?? err),
         finishedAt: new Date().toISOString(),
       })
-      .where(eq(schema.runs.id, run.id))
+      .where(eq(schema.runs.id, runId))
       .run()
   })
-  return { runId: run.id, started: true }
 }
 
 async function processRun(runId: number, site: SiteConfig, pageIds: string[]) {

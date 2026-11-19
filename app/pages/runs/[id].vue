@@ -30,7 +30,7 @@ const expandedCheck = ref<number | null>(null)
 
 const route = useRoute()
 const id = Number(route.params.id)
-const { pageLabel, config, siteId, siteName } = useSentinel()
+const { pageLabel, config, siteId, siteName, refresh: refreshConfig } = useSentinel()
 const { data, refresh, error } = await useFetch<RunDetail>(`/api/runs/${id}`)
 // Viewing a run selects its site, so Overview/Trends/Compare stay consistent with it.
 watch(
@@ -81,7 +81,7 @@ async function remove() {
   await navigateTo('/')
 }
 
-/** Starts a new run limited to one page (both devices) and opens it. */
+/** Measures one page (both devices) again inside this run, replacing its rows. */
 const rerunning = ref(false)
 // one run at a time: no re-run link while this run or any other one is in progress
 const canRerun = computed(
@@ -91,11 +91,8 @@ async function rerunPage(pageId: string) {
   if (!data.value || rerunning.value) return
   rerunning.value = true
   try {
-    const res = await $fetch<{ runId: number; started: boolean }>('/api/runs', {
-      method: 'POST',
-      body: { trigger: 'manual', siteId: data.value.run.siteId, pageIds: [pageId] },
-    })
-    await navigateTo(`/runs/${res.runId}`)
+    await $fetch(`/api/runs/${id}/rerun`, { method: 'POST', body: { pageIds: [pageId] } })
+    await Promise.all([refresh(), refreshConfig()])
   } catch {
     alert('A run is already in progress; wait for it to finish and try again.')
   } finally {
@@ -195,7 +192,7 @@ onUnmounted(() => clearInterval(timer))
                     —
                     <a
                       href="#"
-                      :title="`Start a new run measuring only this page (${config?.strategies.join(' + ')})`"
+                      :title="`Measure this page again (${config?.strategies.join(' + ')}) inside this run`"
                       @click.stop.prevent="rerunPage(r.pageId)"
                       >re-run this page</a
                     >
