@@ -44,6 +44,7 @@ export function startRun(opts: StartOptions): { runId: number; started: boolean 
       startedAt: now,
       checksTotal: pages.length * config.strategies.length,
       checksDone: 0,
+      pageIds: JSON.stringify(pages.map((p) => p.id)),
     })
     .returning()
     .get()
@@ -83,12 +84,22 @@ export function rerunPages(runId: number, pageIds: string[]): { runId: number; s
       .run()
   })
   activeRun = { id: runId, siteId: site.id }
-  launch(runId, site, ids, { status: run.status, error: run.error, checksTotal: run.checksTotal })
+  launch(runId, site, ids, {
+    status: run.status,
+    error: run.error,
+    checksTotal: run.checksTotal,
+    pageIds: run.pageIds,
+  })
   return { runId, started: true }
 }
 
 /** Status a run had before a re-run; a `failed` run only becomes `completed` once every page has a row. */
-type PreviousStatus = { status: string; error: string | null; checksTotal: number } | null
+type PreviousStatus = {
+  status: string
+  error: string | null
+  checksTotal: number
+  pageIds: string | null
+} | null
 
 function launch(
   runId: number,
@@ -185,7 +196,7 @@ async function processRun(
     if (!fatal && !measured) {
       status = 'failed'
       error = 'No page could be measured (site or network down?)'
-    } else if (!fatal && previous?.status === 'failed' && rows < previous.checksTotal) {
+    } else if (!fatal && previous?.status === 'failed' && !scopeCovered(runId, previous, rows)) {
       // partial re-run of an aborted run: pages of its original scope are still missing
       status = 'failed'
       error = previous.error
@@ -208,6 +219,25 @@ function countDone(runId: number) {
       .where(eq(schema.pageResults.runId, runId))
       .get()?.n ?? 0
   )
+}
+
+/**
+ * Every page × device the run was started with has a result row. Runs older than the `page_ids`
+ * column only have the count to compare with.
+ */
+function scopeCovered(runId: number, previous: NonNullable<PreviousStatus>, rows: number) {
+  if (!previous.pageIds) return rows >= previous.checksTotal
+  const scope = JSON.parse(previous.pageIds) as string[]
+  const strategies = useSentinelConfig().strategies
+  const have = new Set(
+    useDb()
+      .select({ pageId: schema.pageResults.pageId, strategy: schema.pageResults.strategy })
+      .from(schema.pageResults)
+      .where(eq(schema.pageResults.runId, runId))
+      .all()
+      .map((r) => `${r.pageId}/${r.strategy}`)
+  )
+  return scope.every((p) => strategies.every((s) => have.has(`${p}/${s}`)))
 }
 
 /** `fail` quality alert for a page × device that could not be measured at all (PSI or browser). */

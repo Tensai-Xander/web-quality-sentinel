@@ -13,6 +13,8 @@ export const runs = sqliteTable(
     error: text('error'),
     checksTotal: integer('checks_total').notNull().default(0),
     checksDone: integer('checks_done').notNull().default(0),
+    /** JSON array of the page ids the run was started with (its scope); null on runs made before this column. */
+    pageIds: text('page_ids'),
   },
   (t) => [index('runs_site_idx').on(t.siteId)]
 )
