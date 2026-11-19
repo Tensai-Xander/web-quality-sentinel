@@ -13,7 +13,8 @@
     "lintfix": "eslint . --fix && prettier --write .",
     "typecheck": "nuxt typecheck",
     "db:studio": "drizzle-kit studio",
-    "sentinel:init": "node scripts/init-config.mjs"
+    "sentinel:init": "node scripts/init-config.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "axe-core": "^4.14.0",
@@ -33,6 +34,7 @@
     "eslint": "^10.13.0",
     "prettier": "^3.9.10",
     "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
     "vue-tsc": "^3.3.13"
   },
   "engines": {
