@@ -4,7 +4,7 @@ export type ClientPage = PageConfig & { url: string; thresholds: Thresholds }
 export interface ClientSite extends Omit<SiteConfig, 'pages'> {
   pages: ClientPage[]
 }
-export interface ClientConfig extends Omit<SentinelConfig, 'sites'> {
+export interface ClientConfig extends SentinelConfig {
   sites: ClientSite[]
   sitesFile: string
   sitesError: string | null

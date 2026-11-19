@@ -10,15 +10,22 @@ export default defineEventHandler(async (event) => {
   const site = sites.find((s) => s.id === siteId)
   if (!site) throw createError({ statusCode: 404, statusMessage: `Unknown site "${siteId}"` })
   assertSiteIdle(siteId)
+  if (body.pages != null && !Array.isArray(body.pages))
+    throw createError({ statusCode: 400, statusMessage: '"pages" must be an array' })
   const inputs = body.pages ?? [body]
+  if (inputs.some((p) => p == null || typeof p !== 'object' || Array.isArray(p)))
+    throw createError({ statusCode: 400, statusMessage: 'every page must be an object' })
   const taken = site.pages.map((p) => p.id)
   const added: PageConfig[] = []
   for (const input of inputs) {
-    const path = String(input.path ?? '').trim()
+    const path = str(input.path)
     if (site.pages.some((p) => p.path === path) || added.some((p) => p.path === path))
       throw createError({ statusCode: 409, statusMessage: `Page "${path}" already exists` })
-    const id = input.id?.trim() || uniqueId(pageIdFromPath(path), taken)
-    const page = validatePage({ ...input, id, path, label: input.label?.trim() || labelFromId(id) })
+    const id = str(input.id) || uniqueId(pageIdFromPath(path), taken)
+    const page = validatePage(
+      { ...input, id, path, label: str(input.label) || labelFromId(id) },
+      site
+    )
     taken.push(page.id)
     added.push(page)
   }

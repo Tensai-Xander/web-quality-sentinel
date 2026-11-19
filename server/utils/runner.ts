@@ -1,10 +1,10 @@
-import { and, desc, eq, inArray, ne } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, lt } from 'drizzle-orm'
 import type { PageConfig, RunTrigger, SiteConfig, Strategy } from '~~/shared/types/sentinel'
 import { useDb, schema } from '../db'
 import type { PsiError, PsiSample } from './psi'
 import { checkRegressions, checkThresholds, type Finding, type MetricValues } from './regression'
 import { getSite, pageUrl, thresholdsFor, useSentinelConfig } from './sentinelConfig'
-import { crawlPage, type CrawlResult } from './crawler'
+import { closeCrawler, crawlPage, type CrawlResult } from './crawler'
 
 let activeRun: { id: number; siteId: string } | null = null
 
@@ -44,6 +44,7 @@ export function startRun(opts: StartOptions): { runId: number; started: boolean 
       startedAt: now,
       checksTotal: pages.length * config.strategies.length,
       checksDone: 0,
+      scope: JSON.stringify({ pages: pages.map((p) => p.id), strategies: config.strategies }),
     })
     .returning()
     .get()
@@ -72,21 +73,41 @@ export function rerunPages(runId: number, pageIds: string[]): { runId: number; s
   if (activeRun) return { runId: activeRun.id, started: false }
 
   const ids = pages.map((p) => p.id)
-  for (const table of [schema.alerts, schema.pageChecks, schema.pageResults])
-    db.delete(table)
-      .where(and(eq(table.runId, runId), inArray(table.pageId, ids)))
+  db.transaction((tx) => {
+    for (const table of [schema.alerts, schema.pageChecks, schema.pageResults])
+      tx.delete(table)
+        .where(and(eq(table.runId, runId), inArray(table.pageId, ids)))
+        .run()
+    tx.update(schema.runs)
+      .set({ status: 'running', error: null, finishedAt: null, checksDone: countDone(runId) })
+      .where(eq(schema.runs.id, runId))
       .run()
-  db.update(schema.runs)
-    .set({ status: 'running', error: null, finishedAt: null, checksDone: countDone(runId) })
-    .where(eq(schema.runs.id, runId))
-    .run()
+  })
   activeRun = { id: runId, siteId: site.id }
-  launch(runId, site, ids)
+  launch(runId, site, ids, {
+    status: run.status,
+    error: run.error,
+    checksTotal: run.checksTotal,
+    scope: run.scope,
+  })
   return { runId, started: true }
 }
 
-function launch(runId: number, site: SiteConfig, pageIds: string[]) {
-  processRun(runId, site, pageIds).catch((err) => {
+/** Status a run had before a re-run; a `failed` run only becomes `completed` once every page has a row. */
+type PreviousStatus = {
+  status: string
+  error: string | null
+  checksTotal: number
+  scope: string | null
+} | null
+
+function launch(
+  runId: number,
+  site: SiteConfig,
+  pageIds: string[],
+  previous: PreviousStatus = null
+) {
+  processRun(runId, site, pageIds, previous).catch((err) => {
     console.error('[sentinel] run failed', err)
     useDb()
       .update(schema.runs)
@@ -100,7 +121,12 @@ function launch(runId: number, site: SiteConfig, pageIds: string[]) {
   })
 }
 
-async function processRun(runId: number, site: SiteConfig, pageIds: string[]) {
+async function processRun(
+  runId: number,
+  site: SiteConfig,
+  pageIds: string[],
+  previous: PreviousStatus
+) {
   const config = useSentinelConfig()
   const db = useDb()
   const { psiApiKey } = useRuntimeConfig()
@@ -144,6 +170,7 @@ async function processRun(runId: number, site: SiteConfig, pageIds: string[]) {
 
         const resultId = storeResult(runId, page.id, url, strategy, samples, error)
         if (samples.length) evaluate(runId, site, page, resultId, url, strategy)
+        else insertFailureAlert(runId, page, url, strategy, `Measurement failed: ${error}`)
 
         db.update(schema.runs)
           .set({ checksDone: countDone(runId) })
@@ -158,25 +185,89 @@ async function processRun(runId: number, site: SiteConfig, pageIds: string[]) {
           await runCrawl(runId, site, page, strategy, i === 0)
     }
 
+    const rows = countDone(runId)
+    const measured = db
+      .select({ n: count() })
+      .from(schema.pageResults)
+      .where(and(eq(schema.pageResults.runId, runId), eq(schema.pageResults.status, 'ok')))
+      .get()?.n
+    let status: 'completed' | 'failed' = fatal ? 'failed' : 'completed'
+    let error = fatal
+    if (!fatal && !measured) {
+      status = 'failed'
+      error = 'No page could be measured (site or network down?)'
+    } else if (!fatal && previous?.status === 'failed' && !scopeCovered(runId, previous, rows)) {
+      // partial re-run of an aborted run: pages of its original scope are still missing
+      status = 'failed'
+      error = previous.error
+    }
     db.update(schema.runs)
-      .set({
-        status: fatal ? 'failed' : 'completed',
-        error: fatal,
-        finishedAt: new Date().toISOString(),
-      })
+      .set({ status, error, finishedAt: new Date().toISOString() })
       .where(eq(schema.runs.id, runId))
       .run()
   } finally {
+    await closeCrawler()
     activeRun = null
   }
 }
 
 function countDone(runId: number) {
-  return useDb()
-    .select({ id: schema.pageResults.id })
-    .from(schema.pageResults)
-    .where(eq(schema.pageResults.runId, runId))
-    .all().length
+  return (
+    useDb()
+      .select({ n: count() })
+      .from(schema.pageResults)
+      .where(eq(schema.pageResults.runId, runId))
+      .get()?.n ?? 0
+  )
+}
+
+/**
+ * Every page × device the run was started with has a result row (the scope is stored with the run,
+ * so later config changes do not alter it). Runs older than the `scope` column only have the count.
+ */
+function scopeCovered(runId: number, previous: NonNullable<PreviousStatus>, rows: number) {
+  if (!previous.scope) return rows >= previous.checksTotal
+  const { pages, strategies } = JSON.parse(previous.scope) as {
+    pages: string[]
+    strategies: string[]
+  }
+  const have = new Set(
+    useDb()
+      .select({ pageId: schema.pageResults.pageId, strategy: schema.pageResults.strategy })
+      .from(schema.pageResults)
+      .where(eq(schema.pageResults.runId, runId))
+      .all()
+      .map((r) => `${r.pageId}/${r.strategy}`)
+  )
+  return pages.every((p) => strategies.every((s) => have.has(`${p}/${s}`)))
+}
+
+/** `fail` quality alert for a page × device that could not be measured at all (PSI or browser). */
+function insertFailureAlert(
+  runId: number,
+  page: PageConfig,
+  url: string,
+  strategy: Strategy,
+  message: string
+) {
+  useDb()
+    .insert(schema.alerts)
+    .values({
+      runId,
+      pageResultId: null,
+      pageId: page.id,
+      url,
+      strategy,
+      metric: 'http',
+      kind: 'quality',
+      severity: 'fail',
+      actual: 0,
+      limit: null,
+      baseline: null,
+      message,
+      createdAt: new Date().toISOString(),
+    })
+    .run()
 }
 
 function storeResult(
@@ -262,7 +353,7 @@ function evaluate(
       and(
         eq(schema.runs.siteId, site.id),
         eq(schema.runs.status, 'completed'),
-        ne(schema.runs.id, runId)
+        lt(schema.runs.id, runId)
       )
     )
     .orderBy(desc(schema.runs.id))
@@ -327,10 +418,21 @@ async function runCrawl(
   let result: CrawlResult | null = null
   let error: string | null = null
   try {
-    result = await crawlPage(url, config.crawl, strategy, checkLinks)
+    // a page whose scripts never yield would otherwise block every later run (no cancel)
+    const deadline = config.crawl.timeoutMs * 3 + 60000
+    result = await Promise.race([
+      crawlPage(url, config.crawl, strategy, checkLinks),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`browser check timed out after ${deadline / 1000} s`)),
+          deadline
+        )
+      ),
+    ])
   } catch (err) {
     error = String((err as Error).message ?? err).slice(0, 300)
     console.warn(`[sentinel] crawl ${strategy} ${url} failed: ${error}`)
+    if (error.startsWith('browser check timed out')) await closeCrawler()
   }
   const jsErrors = (result?.consoleErrors.length ?? 0) + (result?.pageErrors.length ?? 0)
   db.insert(schema.pageChecks)
@@ -357,7 +459,10 @@ async function runCrawl(
       createdAt: new Date().toISOString(),
     })
     .run()
-  if (!result) return
+  if (!result) {
+    insertFailureAlert(runId, page, url, strategy, `Page could not be loaded: ${error}`)
+    return
+  }
 
   const findings: { metric: string; severity: 'warn' | 'fail'; actual: number; message: string }[] =
     []

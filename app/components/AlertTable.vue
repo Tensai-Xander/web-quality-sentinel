@@ -88,7 +88,7 @@ function checkFor(a: Alert) {
           </td>
           <td>{{ a.kind }}</td>
           <td :title="a.url">{{ pageLabel(a.pageId, siteId) }}</td>
-          <td>{{ a.strategy === 'page' ? '–' : a.strategy }}</td>
+          <td>{{ a.strategy }}</td>
           <td>
             {{
               METRIC_LABELS[a.metric as keyof typeof METRIC_LABELS] ??

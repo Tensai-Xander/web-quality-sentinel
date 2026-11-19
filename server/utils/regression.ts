@@ -91,9 +91,10 @@ export function checkRegressions(
   for (const m of TIMING_METRICS) {
     const v = values[m]
     const b = baseline[m]
-    if (v == null || b == null || b <= 0) continue
+    if (v == null || b == null || b < 0) continue
     const delta = v - b
-    const pct = (delta / b) * 100
+    // baseline 0 (typical for CLS, desktop TBT): any increase above the noise floor counts
+    const pct = b > 0 ? (delta / b) * 100 : delta > 0 ? Infinity : 0
     const floor = rules.minDelta[m] ?? 0
     if (pct >= rules.timingIncreasePct && delta >= floor) {
       findings.push({
@@ -103,7 +104,7 @@ export function checkRegressions(
         actual: v,
         limit: null,
         baseline: b,
-        message: `${METRIC_LABELS[m]} went from ${formatMetric(m, b)} (baseline) to ${formatMetric(m, v)} (+${Math.round(pct)}%)`,
+        message: `${METRIC_LABELS[m]} went from ${formatMetric(m, b)} (baseline) to ${formatMetric(m, v)} (${Number.isFinite(pct) ? `+${Math.round(pct)}%` : 'baseline was 0'})`,
       })
     }
   }

@@ -6,6 +6,7 @@ export default defineEventHandler((event) => {
   if (!Number.isInteger(id)) throw createError({ statusCode: 400, statusMessage: 'Invalid run id' })
   if (getActiveRunId() === id)
     throw createError({ statusCode: 409, statusMessage: 'Run is in progress' })
-  useDb().delete(schema.runs).where(eq(schema.runs.id, id)).run()
+  const { changes } = useDb().delete(schema.runs).where(eq(schema.runs.id, id)).run()
+  if (!changes) throw createError({ statusCode: 404, statusMessage: 'Run not found' })
   return { ok: true }
 })

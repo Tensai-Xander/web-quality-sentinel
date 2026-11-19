@@ -5,7 +5,7 @@ import { schema, useDb } from '../db'
 export default defineEventHandler((event) => {
   const q = getQuery(event)
   const strategy = q.strategy === 'desktop' ? 'desktop' : 'mobile'
-  const limit = Math.min(Number(q.limit ?? 30), 365)
+  const limit = queryLimit(q.limit, 30, 365)
   const site = getSite(q.site ? String(q.site) : null)
   const db = useDb()
 

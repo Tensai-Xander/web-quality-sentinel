@@ -6,5 +6,7 @@ export default defineEventHandler(async (event) => {
     ? body.pageIds.filter((p) => typeof p === 'string')
     : []
   if (!pageIds.length) throw createError({ statusCode: 400, statusMessage: 'pageIds is required' })
-  return rerunPages(id, pageIds)
+  const result = rerunPages(id, pageIds)
+  setResponseStatus(event, result.started ? 202 : 409)
+  return result
 })

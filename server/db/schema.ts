@@ -4,7 +4,7 @@ export const runs = sqliteTable(
   'runs',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    siteId: text('site_id').notNull(), // SiteConfig.id from sentinel.config.ts
+    siteId: text('site_id').notNull(), // SiteConfig.id from sentinel.sites.json
     trigger: text('trigger').notNull(), // manual | release
     releaseTag: text('release_tag'),
     status: text('status').notNull(), // running | completed | failed
@@ -13,6 +13,8 @@ export const runs = sqliteTable(
     error: text('error'),
     checksTotal: integer('checks_total').notNull().default(0),
     checksDone: integer('checks_done').notNull().default(0),
+    /** JSON `{ pages: string[], strategies: string[] }` the run was started with; null on runs made before this column. */
+    scope: text('scope'),
   },
   (t) => [index('runs_site_idx').on(t.siteId)]
 )
@@ -73,7 +75,7 @@ export const alerts = sqliteTable(
     url: text('url').notNull(),
     strategy: text('strategy').notNull(),
     metric: text('metric').notNull(),
-    kind: text('kind').notNull(), // threshold | regression
+    kind: text('kind').notNull(), // threshold | regression | quality
     severity: text('severity').notNull(), // warn | fail
     actual: real('actual'),
     limit: real('limit'),
