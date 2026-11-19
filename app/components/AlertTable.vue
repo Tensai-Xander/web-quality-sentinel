@@ -127,8 +127,7 @@ function checkFor(a: Alert) {
                   :class="{ open: openIssue === `${a.id}:${i.id}` }"
                   title="Show details"
                   @click="toggle(`${a.id}:${i.id}`)"
-                  >{{ i.title }}</span
-                ><template v-if="i.savings">
+                  >{{ i.title }}</span><template v-if="i.savings">
                   — ~{{ a.metric === 'cls' ? i.savings.toFixed(3) : Math.round(i.savings) + ' ms' }}
                 </template>
                 <IssueDetail
