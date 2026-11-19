@@ -83,6 +83,10 @@ async function remove() {
 
 /** Starts a new run limited to one page (both devices) and opens it. */
 const rerunning = ref(false)
+// one run at a time: no re-run link while this run or any other one is in progress
+const canRerun = computed(
+  () => data.value?.run.status !== 'running' && config.value?.activeRun == null && !rerunning.value
+)
 async function rerunPage(pageId: string) {
   if (!data.value || rerunning.value) return
   rerunning.value = true
@@ -172,16 +176,6 @@ onUnmounted(() => clearInterval(timer))
                   >
                   <div class="muted small">
                     <a :href="r.url" target="_blank" rel="noopener" @click.stop>{{ r.url }}</a>
-                    <template v-if="sorted.find((x) => x.pageId === r.pageId) === r">
-                      ·
-                      <a
-                        href="#"
-                        :title="`Start a new run measuring only this page (${config?.strategies.join(' + ')})`"
-                        :aria-disabled="rerunning || config?.activeRun != null"
-                        @click.stop.prevent="rerunPage(r.pageId)"
-                        >re-run page</a
-                      >
-                    </template>
                   </div>
                 </td>
                 <td>{{ r.strategy }}</td>
@@ -197,8 +191,15 @@ onUnmounted(() => clearInterval(timer))
                   style="color: var(--poor); white-space: normal"
                 >
                   {{ r.error }}
-                  —
-                  <a href="#" @click.stop.prevent="rerunPage(r.pageId)">re-run this page</a>
+                  <template v-if="canRerun">
+                    —
+                    <a
+                      href="#"
+                      :title="`Start a new run measuring only this page (${config?.strategies.join(' + ')})`"
+                      @click.stop.prevent="rerunPage(r.pageId)"
+                      >re-run this page</a
+                    >
+                  </template>
                 </td>
                 <td class="num">{{ r.samples }}</td>
               </tr>

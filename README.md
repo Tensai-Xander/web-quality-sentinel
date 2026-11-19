@@ -76,9 +76,9 @@ pnpm dev                     # http://localhost:3000
 ```
 
 Pick the site in the top-bar selector and click **Run now**: it measures every page of that site
-(one run at a time, whatever the site). To measure a single page again — typically after a
-`fetch failed` row — use the **re-run page** link on its row of the run page (also offered next
-to the error): it starts a new run containing only that page, both devices, and opens it. A run of 8 pages × 2 devices × 3 samples takes roughly 10
+(one run at a time, whatever the site). A page whose measurement failed (e.g. `fetch failed`)
+shows a **re-run this page** link next to the error on the run page: it starts a new run
+containing only that page, both devices, and opens it (hidden while a run is in progress). A run of 8 pages × 2 devices × 3 samples takes roughly 10
 minutes because PSI is slow and requests are spaced out to respect the quota; the overview page
 refreshes itself while a run is in progress. Results are stored in `.data/sentinel.db` on the
 machine that runs the app, so each installation has its own history. Regression alerts appear from
