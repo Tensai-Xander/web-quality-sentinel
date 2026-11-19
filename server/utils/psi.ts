@@ -181,6 +181,14 @@ function issueDetails(audit: Json): IssueDetails | null {
 
 export function parsePsiResponse(data: Json): PsiSample {
   const lhr = data.lighthouseResult ?? {}
+  // a 200 without usable Lighthouse data (e.g. runtimeError NO_FCP) is a failed sample, not an
+  // "ok" row full of nulls that would then count as history
+  if (lhr?.runtimeError?.code)
+    throw new PsiError(
+      `Lighthouse ${lhr.runtimeError.code}: ${String(lhr.runtimeError.message ?? '').slice(0, 200)}`
+    )
+  if (typeof lhr?.categories?.performance?.score !== 'number')
+    throw new PsiError('PSI answered without a performance score (no Lighthouse result)')
   const field = fieldData(data.loadingExperience)
   const perfRefs: Json[] = lhr?.categories?.performance?.auditRefs ?? []
   const opportunities = perfRefs

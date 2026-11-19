@@ -93,8 +93,13 @@ async function rerunPage(pageId: string) {
   try {
     await $fetch(`/api/runs/${id}/rerun`, { method: 'POST', body: { pageIds: [pageId] } })
     await Promise.all([refresh(), refreshConfig()])
-  } catch {
-    alert('A run is already in progress; wait for it to finish and try again.')
+  } catch (err) {
+    const status = (err as { statusCode?: number }).statusCode
+    alert(
+      status === 409
+        ? 'A run is already in progress; wait for it to finish and try again.'
+        : `Re-run refused: ${(err as { statusMessage?: string }).statusMessage ?? String(err)}`
+    )
   } finally {
     rerunning.value = false
   }

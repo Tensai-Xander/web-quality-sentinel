@@ -4,7 +4,7 @@ export const runs = sqliteTable(
   'runs',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    siteId: text('site_id').notNull(), // SiteConfig.id from sentinel.config.ts
+    siteId: text('site_id').notNull(), // SiteConfig.id from sentinel.sites.json
     trigger: text('trigger').notNull(), // manual | release
     releaseTag: text('release_tag'),
     status: text('status').notNull(), // running | completed | failed
@@ -73,7 +73,7 @@ export const alerts = sqliteTable(
     url: text('url').notNull(),
     strategy: text('strategy').notNull(),
     metric: text('metric').notNull(),
-    kind: text('kind').notNull(), // threshold | regression
+    kind: text('kind').notNull(), // threshold | regression | quality
     severity: text('severity').notNull(), // warn | fail
     actual: real('actual'),
     limit: real('limit'),

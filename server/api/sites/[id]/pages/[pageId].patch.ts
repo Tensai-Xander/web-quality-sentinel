@@ -12,12 +12,15 @@ export default defineEventHandler(async (event) => {
   if (idx < 0) throw createError({ statusCode: 404, statusMessage: `Unknown page "${pageId}"` })
   assertSiteIdle(siteId)
   const current = site.pages[idx]!
-  const next = validatePage({
-    ...current,
-    label: body.label ?? current.label,
-    path: body.path ?? current.path,
-    thresholds: 'thresholds' in body ? body.thresholds : current.thresholds,
-  })
+  const next = validatePage(
+    {
+      ...current,
+      label: body.label ?? current.label,
+      path: body.path ?? current.path,
+      thresholds: 'thresholds' in body ? body.thresholds : current.thresholds,
+    },
+    site
+  )
   if (site.pages.some((p, i) => i !== idx && p.path === next.path))
     throw createError({ statusCode: 409, statusMessage: `Page "${next.path}" already exists` })
   site.pages[idx] = next

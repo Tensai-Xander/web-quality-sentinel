@@ -3,8 +3,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 
 const UA_TAG = 'web-quality-sentinel/1.0 (+https://github.com/Tensai-Xander/web-quality-sentinel)'
-const UA_BASE = `Mozilla/5.0 (compatible; ${UA_TAG})`
-const UA = UA_BASE
+const UA = `Mozilla/5.0 (compatible; ${UA_TAG})`
 
 export interface CrawlOptions {
   /** Max same-site links checked per page. */
@@ -18,7 +17,7 @@ const DEVICES: Record<
   CrawlStrategy,
   { ua: string; viewport: { width: number; height: number }; isMobile: boolean }
 > = {
-  desktop: { ua: UA_BASE, viewport: { width: 1280, height: 900 }, isMobile: false },
+  desktop: { ua: UA, viewport: { width: 1280, height: 900 }, isMobile: false },
   mobile: {
     ua: `Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1 ${UA_TAG}`,
     viewport: { width: 390, height: 844 },

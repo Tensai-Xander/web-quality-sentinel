@@ -4,7 +4,7 @@ import { schema, useDb } from '../db'
 export default defineEventHandler((event) => {
   const db = useDb()
   const q = getQuery(event)
-  const limit = Math.min(Number(q.limit ?? 50), 500)
+  const limit = queryLimit(q.limit, 50, 500)
   // ?site=<id> restricts to one site; without it every site's runs are returned.
   const siteId = q.site ? getSite(String(q.site)).id : null
   const rows = db

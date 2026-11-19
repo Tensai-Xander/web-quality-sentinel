@@ -5,18 +5,13 @@ import { siteIdFromUrl, siteNameFromUrl } from '~~/scripts/lib/sitemap.mjs'
 export default defineEventHandler(async (event) => {
   const body = (await readBody<Partial<SiteConfig>>(event)) ?? {}
   const sites = loadSites()
-  let base = String(body.baseUrl ?? '').trim()
-  try {
-    base = new URL(base).origin
-  } catch {
-    throw createError({ statusCode: 400, statusMessage: 'Base URL must be a valid http(s) URL' })
-  }
+  const base = validateBaseUrl(body.baseUrl)
   const site = validateSite({
     ...body,
-    baseUrl: body.baseUrl,
-    name: body.name?.trim() || siteNameFromUrl(base),
+    baseUrl: base,
+    name: str(body.name) || siteNameFromUrl(base),
     id:
-      body.id?.trim() ||
+      str(body.id) ||
       uniqueId(
         siteIdFromUrl(base),
         sites.map((s) => s.id)

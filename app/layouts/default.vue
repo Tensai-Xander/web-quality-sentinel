@@ -9,6 +9,8 @@ async function runNow() {
     await $fetch('/api/runs', { method: 'POST', body: { trigger: 'manual', siteId: siteId.value } })
     await refreshConfig()
     await navigateTo('/')
+  } catch (err) {
+    alert(`Could not start the run: ${(err as { statusMessage?: string }).statusMessage ?? err}`)
   } finally {
     starting.value = false
   }

@@ -10,12 +10,22 @@ export const CALLS_PER_PAGE = 6 // 3 samples × 2 strategies
 const PARAM_LIKE = /^(\d+|[0-9a-f]{8}-[0-9a-f-]{27,}|[0-9a-f]{16,})$/i
 
 async function fetchText(url) {
+  if (!/^https?:$/.test(new URL(url).protocol)) throw new Error(`${url}: not an http(s) URL`)
   const res = await fetch(url, {
     headers: { 'user-agent': 'web-quality-sentinel/init' },
     signal: AbortSignal.timeout(20000),
   })
   if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`)
   return res.text()
+}
+
+/** Sitemap fetches never leave the site being configured (no redirecting the server elsewhere). */
+function sameOrigin(url, origin) {
+  try {
+    return new URL(url).origin === origin
+  } catch {
+    return false
+  }
 }
 
 function isXml(text) {
@@ -31,7 +41,9 @@ function tag(block, name) {
 async function discoverSitemaps(origin) {
   try {
     const robots = await fetchText(`${origin}/robots.txt`)
-    const found = [...robots.matchAll(/^\s*sitemap:\s*(\S+)/gim)].map((m) => m[1])
+    const found = [...robots.matchAll(/^\s*sitemap:\s*(\S+)/gim)]
+      .map((m) => m[1])
+      .filter((u) => sameOrigin(u, origin))
     if (found.length) return found
   } catch {
     // no robots.txt: fall through
@@ -46,6 +58,10 @@ async function collectUrls(origin, sitemapUrls, warn) {
   while (queue.length && visited < MAX_SITEMAPS) {
     const url = queue.shift()
     visited++
+    if (!sameOrigin(url, origin)) {
+      warn(`skip ${url}: outside ${origin}`)
+      continue
+    }
     let xml
     try {
       xml = await fetchText(url)

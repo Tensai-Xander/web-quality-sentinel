@@ -16,18 +16,13 @@ export default defineEventHandler((event) => {
   const deleteRuns = ['1', 'true'].includes(String(getQuery(event).deleteRuns))
   if (deleteRuns) {
     const db = useDb()
-    const inSite = sql`${schema.pageResults.runId} in (select id from runs where site_id = ${siteId})`
-    db.delete(schema.alerts)
-      .where(
-        and(
-          eq(schema.alerts.pageId, pageId),
-          sql`${schema.alerts.runId} in (select id from runs where site_id = ${siteId})`
-        )
-      )
-      .run()
-    db.delete(schema.pageResults)
-      .where(and(eq(schema.pageResults.pageId, pageId), inSite))
-      .run()
+    const runsOfSite = sql`(select id from runs where site_id = ${siteId})`
+    db.transaction((tx) => {
+      for (const table of [schema.alerts, schema.pageResults, schema.pageChecks])
+        tx.delete(table)
+          .where(and(eq(table.pageId, pageId), sql`${table.runId} in ${runsOfSite}`))
+          .run()
+    })
   }
   return { ok: true, deletedRuns: deleteRuns }
 })

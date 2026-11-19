@@ -89,8 +89,21 @@ For an always-on local service, build once and run the compiled server:
 
 ```bash
 pnpm build
-pnpm start                   # same URL, no file watching
+pnpm start                   # same URL, no file watching; reads .env
 ```
+
+The API has no login, so the server only listens on `127.0.0.1` (`HOST=0.0.0.0 pnpm start` to
+expose it on purpose — then set `NUXT_ALLOWED_HOSTS=<host name>` so the dashboard's requests are
+accepted; any other `Host` is refused). Writes (`POST`/`PATCH`/`DELETE /api/…`) are refused when
+they come from another origin or without a JSON body, so a page open in your browser cannot drive
+the API. Start it from the project folder (or set `SENTINEL_ROOT=/path/to/project`): the sites
+file, the database and the migrations are resolved from there.
+
+`sentinel.sites.json` can be edited by hand, but while it is invalid (JSON typo, unknown field…)
+the Settings page shows the error and every save is refused (409) — the broken file is never
+overwritten with an empty list. `baseUrl` must be an origin (`https://example.com`, no path, query
+or credentials); threshold overrides are checked after merging with the site/global lines, so a
+`warn` line can never end up on the wrong side of `fail`.
 
 ### 5. Reset the database
 
@@ -183,7 +196,9 @@ After the PSI samples of a page, the runner opens it in headless Chromium once p
   audit gives the list of concrete problems behind it, on the real mobile and desktop rendering.
 
 Each finding raises a _quality_ alert (`fail` for HTTP errors, broken links and critical/serious
-accessibility violations, `warn` otherwise). Click a quality alert's message — in the Overview,
+accessibility violations, `warn` otherwise). A page the browser could not load at all, or whose
+PSI samples all failed, raises a `fail` alert too ("Page could not be loaded…" / "Measurement
+failed…"), and a run in which no page could be measured ends `failed` instead of silently green. Click a quality alert's message — in the Overview,
 the run page or the Alerts page — to expand the matching detail in place (broken URLs and their
 status, error messages, meta tag values, JSON-LD issues, failed axe rules with the affected
 elements); the run page's "Quality checks" table shows the full detail of every page and device. `pnpm install` downloads
@@ -213,7 +228,11 @@ users OK?", while the lab metrics answer "did the last release change something?
    machine and `www.googleapis.com`, not a problem with the monitored site) or got a 5xx answer
    is retried `psi.retries` times after `psi.retryDelayMs`; quota (`429`) and key (`400`/`403`)
    errors are never retried and stop the run. A page × device whose samples all failed is stored
-   with the last error message and no metrics.
+   with the last error message and no metrics (+ a `fail` alert). A PSI answer without Lighthouse
+   data (`runtimeError`, no performance score) counts as a failed sample, not as an empty result.
+   A metric whose baseline is 0 (typical for CLS) regresses as soon as it rises above the
+   `minDelta` noise floor. Re-running a page inside a `failed` run keeps the run `failed` until
+   every page × device has a result.
 2. **Thresholds** – each stored value is compared with the two absolute lines of its metric
    (`thresholds`, or the site/page override). Crossing a line raises a _threshold_ alert.
 3. **Baseline** – the median of the same page × device × metric over the previous
@@ -247,29 +266,31 @@ curl -X POST http://localhost:3000/api/runs \
   -d '{"siteId":"toyota-community","trigger":"release","releaseTag":"v1.4.2"}'
 ```
 
-`siteId` defaults to the first configured site. Optional `pageIds: ["home", "faq"]` limits the run to some pages. The release tag is shown in the
+`siteId` defaults to the first configured site. Optional `pageIds: ["home", "faq"]` limits the run to some pages (unknown ids, a non-string `releaseTag` or an unknown `trigger` → 400). Answers `202` when the run started, `409` when another run is in progress. The release tag is shown in the
 run list and on the trend charts, which makes release-to-release comparison easy in **Compare**.
 
 ## API
 
-| Method   | Path                           | Description                                                       |
-| -------- | ------------------------------ | ----------------------------------------------------------------- |
-| `GET`    | `/api/config`                  | Effective configuration, sites and pages (+ whether a key is set) |
-| `GET`    | `/api/runs?site=&limit=`       | Run list with alert counts (`site` optional: all sites if absent) |
-| `POST`   | `/api/runs`                    | Start a run (`siteId`, `trigger`, `releaseTag`, `pageIds`)        |
-| `POST`   | `/api/runs/:id/rerun`          | Measure some pages of that run again in place (`pageIds`)         |
-| `GET`    | `/api/runs/:id`                | Run with page results (incl. samples) and alerts                  |
-| `DELETE` | `/api/runs/:id`                | Delete a run and its data                                         |
-| `GET`    | `/api/trends?site=&strategy=`  | Metric history per page of one site for the trend charts          |
-| `GET`    | `/api/compare?from=&to=`       | Results of two runs side by side                                  |
-| `GET`    | `/api/alerts?site=&limit=`     | Latest alerts (`site` optional)                                   |
-| `POST`   | `/api/sites`                   | Add a site (`baseUrl`, optional `name`, `id`, `pages`)            |
-| `PATCH`  | `/api/sites/:id`               | Edit a site's `name`, `baseUrl`, `thresholds`                     |
-| `DELETE` | `/api/sites/:id?deleteRuns=`   | Remove a site (history kept unless `deleteRuns=1`)                |
-| `POST`   | `/api/sites/:id/pages`         | Add a page `{ path, label?, id?, thresholds? }` or `{ pages }`    |
-| `PATCH`  | `/api/sites/:id/pages/:pageId` | Edit a page's `label`, `path`, `thresholds`                       |
-| `DELETE` | `/api/sites/:id/pages/:pageId` | Remove a page (`deleteRuns=1` also deletes its results)           |
-| `POST`   | `/api/sitemap`                 | Propose pages from a site's sitemap (`{ url }`)                   |
+| Method   | Path                           | Description                                                                           |
+| -------- | ------------------------------ | ------------------------------------------------------------------------------------- |
+| `GET`    | `/api/config`                  | Effective configuration, sites and pages (+ whether a key is set)                     |
+| `GET`    | `/api/runs?site=&limit=`       | Run list with alert counts (`site` optional: all sites if absent)                     |
+| `POST`   | `/api/runs`                    | Start a run (`siteId`, `trigger`, `releaseTag`, `pageIds`)                            |
+| `POST`   | `/api/runs/:id/rerun`          | Measure some pages of that run again in place (`pageIds`); 202/409                    |
+| `GET`    | `/api/runs/:id`                | Run with page results (incl. samples) and alerts                                      |
+| `DELETE` | `/api/runs/:id`                | Delete a run and its data (404 if unknown)                                            |
+| `GET`    | `/api/trends?site=&strategy=`  | Metric history per page of one site for the trend charts                              |
+| `GET`    | `/api/compare?from=&to=`       | Results of two runs side by side                                                      |
+| `GET`    | `/api/alerts?site=&limit=`     | Latest alerts (`site` optional)                                                       |
+| `POST`   | `/api/sites`                   | Add a site (`baseUrl`, optional `name`, `id`, `pages`)                                |
+| `PATCH`  | `/api/sites/:id`               | Edit a site's `name`, `baseUrl`, `thresholds`                                         |
+| `DELETE` | `/api/sites/:id?deleteRuns=`   | Remove a site (history kept unless `deleteRuns=1`)                                    |
+| `POST`   | `/api/sites/:id/pages`         | Add a page `{ path, label?, id?, thresholds? }` or `{ pages }`                        |
+| `PATCH`  | `/api/sites/:id/pages/:pageId` | Edit a page's `label`, `path`, `thresholds`                                           |
+| `DELETE` | `/api/sites/:id/pages/:pageId` | Remove a page (`deleteRuns=1` also deletes its results and checks)                    |
+| `POST`   | `/api/sitemap`                 | Propose pages from a site's sitemap (`{ url }`, http(s); fetches stay on that origin) |
+
+`limit` must be a positive integer (anything else → the default). Writes need `Content-Type: application/json` and a same-origin request (or none, e.g. `curl`).
 
 ## Development without burning quota
 
