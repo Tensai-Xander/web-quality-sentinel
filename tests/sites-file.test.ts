@@ -9,7 +9,7 @@ const file = () => join(root, 'sentinel.sites.json')
 /** Writes with a distinct mtime: the loader's cache is keyed on it and FS timestamps may be coarse. */
 let clock = 1_700_000_000
 function write(content: string) {
-  write(content)
+  writeFileSync(file(), content)
   utimesSync(file(), ++clock, clock)
 }
 
