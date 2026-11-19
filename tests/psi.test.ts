@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   PsiError,
   aggregateSamples,
   cacheBustUrl,
+  fetchPsi,
   median,
   parsePsiResponse,
 } from '~~/server/utils/psi'
@@ -90,5 +91,30 @@ describe('cacheBustUrl', () => {
     expect(u.searchParams.get('b')).toBe('1')
     expect(u.searchParams.get('sentinel')).toMatch(/\S/)
     expect(u.pathname).toBe('/a')
+  })
+})
+
+describe('fetchPsi error classification', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  const answer = (status: number, message: string) =>
+    vi.stubGlobal(
+      'fetch',
+      async () => new Response(JSON.stringify({ error: { message } }), { status })
+    )
+  const call = () =>
+    fetchPsi('https://x.example/', 'mobile', ['performance'], 'key').catch((e) => e)
+
+  it('a Lighthouse lab failure (400 NO_FCP) carries no status: retried, never fatal', async () => {
+    answer(400, 'Lighthouse returned error: NO_FCP. The page did not paint any content.')
+    const err = await call()
+    expect(err).toBeInstanceOf(PsiError)
+    expect(err.status).toBeUndefined()
+    expect(err.message).toMatch(/NO_FCP/)
+  })
+  it('key and quota errors keep their status', async () => {
+    answer(400, 'API key not valid. Please pass a valid API key.')
+    expect((await call()).status).toBe(400)
+    answer(429, 'Quota exceeded')
+    expect((await call()).status).toBe(429)
   })
 })

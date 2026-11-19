@@ -294,7 +294,13 @@ export async function fetchPsi(
     } catch {
       /* ignore */
     }
-    throw new PsiError(`PSI ${res.status}${detail ? `: ${detail}` : ''}`, res.status)
+    // "Lighthouse returned error: NO_FCP…" is a lab-run failure on Google's side (transient, the
+    // page itself is fine), not a key/quota problem: no status, so it is retried and never fatal.
+    const lighthouse = res.status === 400 && /Lighthouse returned error/i.test(detail)
+    throw new PsiError(
+      `PSI ${res.status}${detail ? `: ${detail}` : ''}`,
+      lighthouse ? undefined : res.status
+    )
   }
   return parsePsiResponse(await res.json())
 }

@@ -226,7 +226,9 @@ users OK?", while the lab metrics answer "did the last release change something?
    table shows the analysis time of each sample. A sample whose request never reached Google
    (`fetch failed (ENOTFOUND …)`, `ECONNRESET`, timeout — i.e. a network problem between your
    machine and `www.googleapis.com`, not a problem with the monitored site) or got a 5xx answer
-   is retried `psi.retries` times after `psi.retryDelayMs`; quota (`429`) and key (`400`/`403`)
+   is retried `psi.retries` times after `psi.retryDelayMs`, and so is a Lighthouse lab failure
+   (`PSI 400: Lighthouse returned error: NO_FCP…` — Google's headless Chrome painted nothing in
+   time; the site is fine, just re-run that page); quota (`429`) and key (`400`/`403`)
    errors are never retried and stop the run. A page × device whose samples all failed is stored
    with the last error message and no metrics (+ a `fail` alert). A PSI answer without Lighthouse
    data (`runtimeError`, no performance score) counts as a failed sample, not as an empty result.

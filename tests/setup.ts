@@ -14,6 +14,11 @@ export class H3Error extends Error {
 Object.assign(globalThis, {
   createError: (input: { statusCode?: number; statusMessage?: string }) => new H3Error(input),
   getActiveRun: () => null,
+  useRuntimeConfig: () => ({
+    psiApiKey: '',
+    psiEndpoint: 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed',
+    dbPath: '.data/sentinel.db',
+  }),
   projectRoot,
   queryLimit,
   str,
