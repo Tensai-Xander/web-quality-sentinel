@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -6,6 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const site = { id: 'demo', name: 'Demo', baseUrl: 'https://demo.example', pages: [] }
 let root: string
 const file = () => join(root, 'sentinel.sites.json')
+/** Writes with a distinct mtime: the loader's cache is keyed on it and FS timestamps may be coarse. */
+let clock = 1_700_000_000
+function write(content: string) {
+  write(content)
+  utimesSync(file(), ++clock, clock)
+}
 
 async function load() {
   vi.resetModules()
@@ -29,7 +35,7 @@ describe('loadSites / saveSites', () => {
     expect(m.sitesError()).toBeNull()
   })
   it('returns a copy, so callers cannot change the cached list', async () => {
-    writeFileSync(file(), JSON.stringify({ sites: [site] }))
+    write(JSON.stringify({ sites: [site] }))
     const m = await load()
     const first = m.loadSites()
     first[0]!.name = 'Changed'
@@ -37,10 +43,10 @@ describe('loadSites / saveSites', () => {
     expect(m.loadSites()).toEqual([site])
   })
   it('an invalid file keeps the last good list, reports the error once and blocks saves', async () => {
-    writeFileSync(file(), JSON.stringify({ sites: [site] }))
+    write(JSON.stringify({ sites: [site] }))
     const m = await load()
     expect(m.loadSites()).toEqual([site])
-    writeFileSync(file(), '{ "sites": [ oops')
+    write('{ "sites": [ oops')
     expect(m.loadSites()).toEqual([site])
     expect(m.sitesError()).toMatch(/sentinel\.sites\.json/)
     m.loadSites()
@@ -49,7 +55,7 @@ describe('loadSites / saveSites', () => {
     expect(readFileSync(file(), 'utf8')).toBe('{ "sites": [ oops')
   })
   it('a wrong document shape ({ "site": [] }) is invalid too', async () => {
-    writeFileSync(file(), JSON.stringify({ site: [site] }))
+    write(JSON.stringify({ site: [site] }))
     const m = await load()
     expect(m.loadSites()).toEqual([])
     expect(m.sitesError()).toMatch(/expected \{ "sites"/)
