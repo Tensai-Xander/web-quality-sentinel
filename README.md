@@ -306,6 +306,18 @@ curl -X POST localhost:3999/reset
 Other useful commands: `pnpm lint`, `pnpm lintfix`, `pnpm typecheck`, `pnpm db:studio`
 (browse the SQLite file with Drizzle Studio).
 
+## Tests and CI
+
+```bash
+pnpm test                    # Vitest unit tests (tests/), no network, no PSI quota
+```
+
+They cover the threshold lines and alert severities, regression detection (incl. baseline 0),
+site/page/threshold validation, the sites-file loader (invalid file never overwritten), PSI
+response parsing and aggregation, and the sitemap proposal (fetches stay on the site's origin).
+GitHub Actions (`.github/workflows/ci.yml`) runs `lint`, `typecheck`, `test` and `build` on every
+pull request and on `main`.
+
 ## Project layout
 
 ```
