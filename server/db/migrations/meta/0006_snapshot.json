@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "42ad8527-a6b8-4901-bfad-73f0362c6de6",
+  "id": "351e3bd9-f8ff-4e03-b1c6-3a89ed0e930f",
   "prevId": "626a9d15-3def-4b56-8bc2-abcc9742d8d1",
   "tables": {
     "alerts": {
@@ -628,8 +628,8 @@
           "autoincrement": false,
           "default": 0
         },
-        "page_ids": {
-          "name": "page_ids",
+        "scope": {
+          "name": "scope",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

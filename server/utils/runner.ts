@@ -44,7 +44,7 @@ export function startRun(opts: StartOptions): { runId: number; started: boolean 
       startedAt: now,
       checksTotal: pages.length * config.strategies.length,
       checksDone: 0,
-      pageIds: JSON.stringify(pages.map((p) => p.id)),
+      scope: JSON.stringify({ pages: pages.map((p) => p.id), strategies: config.strategies }),
     })
     .returning()
     .get()
@@ -88,7 +88,7 @@ export function rerunPages(runId: number, pageIds: string[]): { runId: number; s
     status: run.status,
     error: run.error,
     checksTotal: run.checksTotal,
-    pageIds: run.pageIds,
+    scope: run.scope,
   })
   return { runId, started: true }
 }
@@ -98,7 +98,7 @@ type PreviousStatus = {
   status: string
   error: string | null
   checksTotal: number
-  pageIds: string | null
+  scope: string | null
 } | null
 
 function launch(
@@ -222,13 +222,15 @@ function countDone(runId: number) {
 }
 
 /**
- * Every page × device the run was started with has a result row. Runs older than the `page_ids`
- * column only have the count to compare with.
+ * Every page × device the run was started with has a result row (the scope is stored with the run,
+ * so later config changes do not alter it). Runs older than the `scope` column only have the count.
  */
 function scopeCovered(runId: number, previous: NonNullable<PreviousStatus>, rows: number) {
-  if (!previous.pageIds) return rows >= previous.checksTotal
-  const scope = JSON.parse(previous.pageIds) as string[]
-  const strategies = useSentinelConfig().strategies
+  if (!previous.scope) return rows >= previous.checksTotal
+  const { pages, strategies } = JSON.parse(previous.scope) as {
+    pages: string[]
+    strategies: string[]
+  }
   const have = new Set(
     useDb()
       .select({ pageId: schema.pageResults.pageId, strategy: schema.pageResults.strategy })
@@ -237,7 +239,7 @@ function scopeCovered(runId: number, previous: NonNullable<PreviousStatus>, rows
       .all()
       .map((r) => `${r.pageId}/${r.strategy}`)
   )
-  return scope.every((p) => strategies.every((s) => have.has(`${p}/${s}`)))
+  return pages.every((p) => strategies.every((s) => have.has(`${p}/${s}`)))
 }
 
 /** `fail` quality alert for a page × device that could not be measured at all (PSI or browser). */
