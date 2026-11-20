@@ -106,12 +106,14 @@ async function rerunPage(pageId: string) {
 }
 
 let timer: ReturnType<typeof setInterval> | undefined
-// Link from the Overview: `?page=<pageId>` opens that page's first row; the `#page-<pageId>`
-// hash (same row's id) lets the router scroll to it.
+// Link from the Overview: `?page=<pageId>&device=<strategy>` opens that row (the first row of the
+// page when no device is given); the `#page-<pageId>-<strategy>` hash lets the router scroll to it.
 function openPageFromQuery() {
-  const pageId = route.query.page
+  const { page: pageId, device } = route.query
   if (typeof pageId !== 'string' || expanded.value !== null) return
-  const r = sorted.value.find((x) => x.pageId === pageId)
+  const r = sorted.value.find(
+    (x) => x.pageId === pageId && (typeof device !== 'string' || x.strategy === device)
+  )
   if (r) expanded.value = r.id
 }
 watch(sorted, openPageFromQuery, { immediate: true })
@@ -162,9 +164,7 @@ onUnmounted(() => clearInterval(timer))
           <tbody>
             <template v-for="r in sorted" :key="r.id">
               <tr
-                :id="
-                  sorted.find((x) => x.pageId === r.pageId) === r ? `page-${r.pageId}` : undefined
-                "
+                :id="`page-${r.pageId}-${r.strategy}`"
                 class="clickable"
                 @click="expanded = expanded === r.id ? null : r.id"
               >
