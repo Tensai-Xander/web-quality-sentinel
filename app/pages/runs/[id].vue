@@ -325,6 +325,7 @@ onUnmounted(() => clearInterval(timer))
                     :checks="data.checks"
                     :site-id="data.run.siteId"
                     :issues-for="issuesFor"
+                    hide-page-device
                   />
                 </td>
               </tr>

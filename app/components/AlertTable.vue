@@ -37,6 +37,8 @@ const props = defineProps<{
   pages?: { id: string; label: string }[]
   page?: string | null
   device?: string | null
+  /** Omit the Page and Device columns (table shown inside a page × device row). */
+  hidePageDevice?: boolean
   /**
    * Browser checks of the alerts' run, so quality alerts can expand their detail in place.
    * When omitted (alerts of several runs), the run is fetched on first expand.
@@ -134,8 +136,10 @@ function checkFor(a: Alert) {
         <tr>
           <th>Severity</th>
           <th>Kind</th>
-          <th>Page</th>
-          <th>Device</th>
+          <template v-if="!hidePageDevice">
+            <th>Page</th>
+            <th>Device</th>
+          </template>
           <th>Metric</th>
           <th class="num">Actual</th>
           <th class="num">Limit</th>
@@ -149,8 +153,10 @@ function checkFor(a: Alert) {
               <span class="pill" :class="a.severity">{{ a.severity }}</span>
             </td>
             <td>{{ a.kind }}</td>
-            <td :title="a.url">{{ pageLabel(a.pageId, siteId) }}</td>
-            <td>{{ a.strategy }}</td>
+            <template v-if="!hidePageDevice">
+              <td :title="a.url">{{ pageLabel(a.pageId, siteId) }}</td>
+              <td>{{ a.strategy }}</td>
+            </template>
             <td>
               {{
                 METRIC_LABELS[a.metric as keyof typeof METRIC_LABELS] ??
@@ -232,7 +238,10 @@ function checkFor(a: Alert) {
             </td>
           </tr>
           <tr v-if="a.kind === 'quality' && openCheck === a.id">
-            <td colspan="9" style="white-space: normal; padding: 0.4rem 0.6rem">
+            <td
+              :colspan="hidePageDevice ? 7 : 9"
+              style="white-space: normal; padding: 0.4rem 0.6rem"
+            >
               <div class="issue-detail" style="margin: 0">
                 <template v-if="checkFor(a) === undefined">
                   <span class="muted small">{{
