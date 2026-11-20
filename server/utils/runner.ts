@@ -1,8 +1,8 @@
-import { and, count, desc, eq, inArray, lt } from 'drizzle-orm'
+import { and, count, eq, inArray } from 'drizzle-orm'
 import type { PageConfig, RunTrigger, SiteConfig, Strategy } from '~~/shared/types/sentinel'
 import { useDb, schema } from '../db'
 import type { PsiError, PsiSample } from './psi'
-import { checkRegressions, checkThresholds, type Finding, type MetricValues } from './regression'
+import { checkThresholds, type MetricValues } from './findings'
 import { getSite, pageUrl, thresholdsFor, useSentinelConfig } from './sentinelConfig'
 import { closeCrawler, crawlPage, type CrawlResult } from './crawler'
 
@@ -263,7 +263,6 @@ function insertFailureAlert(
       severity: 'fail',
       actual: 0,
       limit: null,
-      baseline: null,
       message,
       createdAt: new Date().toISOString(),
     })
@@ -334,7 +333,6 @@ function evaluate(
   url: string,
   strategy: Strategy
 ) {
-  const config = useSentinelConfig()
   const db = useDb()
   const pageId = page.id
   const current = db
@@ -346,41 +344,7 @@ function evaluate(
   // Non-indexable pages are penalised by Lighthouse SEO on purpose; do not alert on it.
   if (current.noindex) delete values.seo
 
-  const previousRunIds = db
-    .select({ id: schema.runs.id })
-    .from(schema.runs)
-    .where(
-      and(
-        eq(schema.runs.siteId, site.id),
-        eq(schema.runs.status, 'completed'),
-        lt(schema.runs.id, runId)
-      )
-    )
-    .orderBy(desc(schema.runs.id))
-    .limit(config.regression.baselineRuns)
-    .all()
-    .map((r) => r.id)
-
-  const history = previousRunIds.length
-    ? db
-        .select()
-        .from(schema.pageResults)
-        .where(
-          and(
-            inArray(schema.pageResults.runId, previousRunIds),
-            eq(schema.pageResults.pageId, pageId),
-            eq(schema.pageResults.strategy, strategy),
-            eq(schema.pageResults.status, 'ok')
-          )
-        )
-        .all()
-        .map(toValues)
-    : []
-
-  const findings: Finding[] = [
-    ...checkThresholds(values, thresholdsFor(site, page)),
-    ...checkRegressions(values, history, config.regression),
-  ]
+  const findings = checkThresholds(values, thresholdsFor(site, page))
   if (!findings.length) return
 
   db.insert(schema.alerts)
@@ -396,7 +360,6 @@ function evaluate(
         severity: f.severity,
         actual: f.actual,
         limit: f.limit,
-        baseline: f.baseline,
         message: f.message,
         createdAt: new Date().toISOString(),
       }))
@@ -528,7 +491,6 @@ async function runCrawl(
         severity: f.severity,
         actual: f.actual,
         limit: null,
-        baseline: null,
         message: f.message,
         createdAt: new Date().toISOString(),
       }))

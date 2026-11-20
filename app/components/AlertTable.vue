@@ -72,7 +72,7 @@ function checkFor(a: Alert) {
         <th>Device</th>
         <th>Metric</th>
         <th class="num">Actual</th>
-        <th class="num">Limit / baseline</th>
+        <th class="num">Limit</th>
         <th>Message</th>
         <th v-if="showRun">When</th>
       </tr>
@@ -100,11 +100,7 @@ function checkFor(a: Alert) {
             {{ a.kind === 'quality' ? a.actual : formatMetric(a.metric, a.actual) }}
           </td>
           <td class="num">
-            {{
-              a.kind === 'quality'
-                ? '–'
-                : formatMetric(a.metric, a.kind === 'threshold' ? a.limit : a.baseline)
-            }}
+            {{ a.kind === 'quality' ? '–' : formatMetric(a.metric, a.limit) }}
           </td>
           <td style="white-space: normal">
             <span

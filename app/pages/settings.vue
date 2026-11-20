@@ -2,7 +2,6 @@
 import {
   THRESHOLD_METRICS,
   METRIC_LABELS,
-  type Metric,
   type ThresholdLine,
   type ThresholdOverrides,
 } from '~~/shared/types/sentinel'
@@ -208,8 +207,8 @@ function alreadyHas(site: ClientSite, path: string) {
       <h1>Settings</h1>
       <p class="muted small">
         Sites and pages are stored in <code>{{ config.sitesFile }}</code> and can be edited below
-        (changes apply to the next run). Default thresholds, regression rules and PSI options come
-        from <code>sentinel.config.ts</code>.
+        (changes apply to the next run). Default thresholds and PSI options come from
+        <code>sentinel.config.ts</code>.
       </p>
       <p v-if="config.sitesError" class="small" style="color: var(--poor)">
         ⚠ {{ config.sitesError }}
@@ -577,35 +576,6 @@ function alreadyHas(site: ClientSite, path: string) {
         Same as <code>pnpm sentinel:init &lt;url&gt;</code>. Each site has its own pages, history
         and selector entry in the top bar.
       </p>
-    </section>
-
-    <section class="card">
-      <h2>Regression rules</h2>
-      <ul>
-        <li>
-          Baseline = median of the previous
-          <strong>{{ config.regression.baselineRuns }}</strong> completed runs of the same site
-          (minimum 2).
-        </li>
-        <li>
-          Score regression when a category drops by ≥
-          <strong>{{ config.regression.scoreDrop }}</strong> points.
-        </li>
-        <li>
-          Timing regression when a metric increases by ≥
-          <strong>{{ config.regression.timingIncreasePct }}%</strong>
-          and by more than the noise floor:
-          <span
-            v-for="(v, m) in config.regression.minDelta"
-            :key="m"
-            class="pill"
-            style="margin-left: 0.3em"
-          >
-            {{ METRIC_LABELS[m as Metric] }} {{ formatMetric(m, v) }}
-          </span>
-        </li>
-      </ul>
-      <p class="muted small">Edit <code>sentinel.config.ts</code> and restart to change these.</p>
     </section>
   </div>
 </template>

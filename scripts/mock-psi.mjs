@@ -5,7 +5,7 @@
 //   NUXT_PSI_ENDPOINT=http://localhost:3999 pnpm dev
 //
 // Send `curl -X POST localhost:3999/degrade` to make every following response ~30% slower
-// (and scores lower) — handy to see regression alerts appear. `POST /reset` restores it.
+// (and scores lower) — handy to see threshold alerts appear. `POST /reset` restores it.
 import { createServer } from 'node:http'
 
 const port = Number(process.env.PORT ?? 3999)

@@ -1,6 +1,7 @@
 # Web Quality Sentinel
 
-Monitors the quality of one or several websites over time and flags regressions. Every run asks
+Monitors the quality of one or several websites over time and alerts when a metric crosses one
+of Google's lines. Every run asks
 [Google PageSpeed Insights](https://developers.google.com/speed/docs/insights/v5/get-started)
 (Lighthouse) for the performance, accessibility, best-practices and SEO scores plus the lab
 timings (LCP, CLS, TBT, FCP, Speed Index, TTFB) of each configured page, on mobile and desktop.
@@ -82,8 +83,7 @@ shows a **re-run this page** link next to the error on the run page: the page is
 run shows `running` meanwhile. The link is hidden while a run is in progress. A run of 8 pages × 2 devices × 3 samples takes roughly 10
 minutes because PSI is slow and requests are spaced out to respect the quota; the overview page
 refreshes itself while a run is in progress. Results are stored in `.data/sentinel.db` on the
-machine that runs the app, so each installation has its own history. Regression alerts appear from
-the third run of a site (two previous runs of the same site are needed as a baseline).
+machine that runs the app, so each installation has its own history.
 
 For an always-on local service, build once and run the compiled server:
 
@@ -132,7 +132,6 @@ through git). The global rules live in [`sentinel.config.ts`](./sentinel.config.
 | `strategies` | `['mobile', 'desktop']` — remove one to halve the number of PSI requests.                                                                                                                                                                                                                                                                                 |
 | `psi`        | `samples` (median is stored), `delayMs` between requests, Lighthouse `categories`, `retries` / `retryDelayMs` for samples that fail on the network.                                                                                                                                                                                                       |
 | `thresholds` | Absolute limits, two lines per metric `{ warn, fail }` for the scores (0–100, alert when below) and LCP/CLS/TBT/FCP (alert when above). Defaults are Google's colour-band boundaries (see below). Breaches raise _threshold_ alerts. Pages that are not indexable (`noindex`, detected via the Lighthouse `is-crawlable` audit) are never alerted on SEO. |
-| `regression` | Relative limits vs. the baseline (median of the previous `baselineRuns` completed runs).                                                                                                                                                                                                                                                                  |
 
 ### Where the default thresholds come from
 
@@ -216,7 +215,7 @@ origin-wide data, which is ignored and shown as "No data" (small or internal sit
 none). Field data moves slowly (28-day window) and never raises alerts; it answers "are real
 users OK?", while the lab metrics answer "did the last release change something?".
 
-## How regressions are detected
+## How alerts are raised
 
 1. **Noise reduction** – each page × device is measured `psi.samples` times (default 3) and the
    median of every metric is stored. PSI returns a cached copy when the same URL is requested
@@ -233,26 +232,20 @@ users OK?", while the lab metrics answer "did the last release change something?
    errors are never retried and stop the run. A page × device whose samples all failed is stored
    with the last error message and no metrics (+ a `fail` alert). A PSI answer without Lighthouse
    data (`runtimeError`, no performance score) counts as a failed sample, not as an empty result.
-   A metric whose baseline is 0 (typical for CLS) regresses as soon as it rises above the
-   `minDelta` noise floor. Re-running a page inside a `failed` run keeps the run `failed` until
+   Re-running a page inside a `failed` run keeps the run `failed` until
    every page × device has a result.
 2. **Thresholds** – each stored value is compared with the two absolute lines of its metric
    (`thresholds`, or the site/page override). Crossing a line raises a _threshold_ alert.
-3. **Baseline** – the median of the same page × device × metric over the previous
-   `regression.baselineRuns` completed runs (at least 2 runs are required, so the first two runs
-   never produce regression alerts).
-4. **Regression** – a score lower than the baseline by `scoreDrop` points, or a timing higher by
-   `timingIncreasePct` _and_ by more than the per-metric noise floor `minDelta`, raises a
-   _regression_ alert.
+3. **History** – there are no relative "regression" rules: a change that stays inside a colour
+   band raises nothing. Use the Trends chart (both lines drawn), the deltas on the run page and
+   the Compare page to spot such drifts by eye.
 
 ### Alert severity (`warn` / `fail`)
 
-| Alert                              | `warn`                                 | `fail`                                     |
-| ---------------------------------- | -------------------------------------- | ------------------------------------------ |
-| Threshold, score (perf, a11y, …)   | below the `warn` line (default 90)     | below the `fail` line (default 50)         |
-| Threshold, timing (LCP, CLS, TBT…) | above the `warn` line (e.g. LCP 2.5 s) | above the `fail` line (e.g. LCP 4 s)       |
-| Regression, score                  | drop ≥ `scoreDrop` (10 pts)            | drop ≥ 2 × `scoreDrop` (20 pts)            |
-| Regression, timing                 | increase ≥ `timingIncreasePct` (50 %)  | increase ≥ 2 × `timingIncreasePct` (100 %) |
+| Alert                              | `warn`                                 | `fail`                               |
+| ---------------------------------- | -------------------------------------- | ------------------------------------ |
+| Threshold, score (perf, a11y, …)   | below the `warn` line (default 90)     | below the `fail` line (default 50)   |
+| Threshold, timing (LCP, CLS, TBT…) | above the `warn` line (e.g. LCP 2.5 s) | above the `fail` line (e.g. LCP 4 s) |
 
 Example with the default performance lines 90 / 50: a score of 72 (orange) is a `warn`, 38 (red)
 is a `fail`, 93 (green) raises nothing. Quality alerts (browser checks) have their own rule: HTTP
@@ -302,7 +295,7 @@ run list and on the trend charts, which makes release-to-release comparison easy
 ```bash
 node scripts/mock-psi.mjs                       # terminal 1, listens on :3999
 NUXT_PSI_ENDPOINT=http://localhost:3999 pnpm dev   # terminal 2
-curl -X POST localhost:3999/degrade             # make the next runs ~30% slower → regression alerts
+curl -X POST localhost:3999/degrade             # make the next runs ~30% slower → more threshold alerts
 curl -X POST localhost:3999/reset
 ```
 
@@ -315,8 +308,7 @@ Other useful commands: `pnpm lint`, `pnpm lintfix`, `pnpm typecheck`, `pnpm db:s
 pnpm test                    # Vitest unit tests (tests/), no network, no PSI quota
 ```
 
-They cover the threshold lines and alert severities, regression detection (incl. baseline 0),
-site/page/threshold validation, the sites-file loader (invalid file never overwritten), PSI
+They cover the threshold lines and alert severities, site/page/threshold validation, the sites-file loader (invalid file never overwritten), PSI
 response parsing and aggregation, and the sitemap proposal (fetches stay on the site's origin).
 GitHub Actions (`.github/workflows/ci.yml`) runs `lint`, `typecheck`, `test` and `build` on every
 pull request and on `main`.
@@ -325,11 +317,11 @@ pull request and on `main`.
 
 ```
 sentinel.sites.json     sites and their pages (edited from Settings / sentinel:init)
-sentinel.config.ts      thresholds, regression rules, PSI options
+sentinel.config.ts      thresholds, PSI options, browser-check options
 shared/                 types and formatting helpers shared by server and UI
 server/db/              Drizzle schema + SQL migrations (applied automatically at startup)
 server/utils/psi.ts     PageSpeed Insights client, CrUX field data, median aggregation
-server/utils/regression.ts  threshold and baseline/regression rules
+server/utils/findings.ts  threshold alerts (warn / fail lines)
 server/utils/runner.ts  run orchestration (one run at a time, progress, error handling)
 server/utils/crawler.ts Playwright visit: HTTP/JS errors, broken links, meta tags, JSON-LD, axe-core
 server/api/             JSON API used by the dashboard and by CI
