@@ -39,7 +39,6 @@ onUnmounted(() => clearInterval(timer))
       <nav>
         <NuxtLink to="/">Overview</NuxtLink>
         <NuxtLink to="/trends">Trends</NuxtLink>
-        <NuxtLink to="/alerts">Alerts</NuxtLink>
         <NuxtLink to="/compare">Compare</NuxtLink>
         <NuxtLink to="/settings">Settings</NuxtLink>
       </nav>
