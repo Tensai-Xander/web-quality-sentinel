@@ -137,12 +137,17 @@ onUnmounted(() => clearInterval(timer))
               :key="p.id"
               :class="{ clickable: latest }"
               :title="latest ? `Open run #${latest.run.id}, ${p.label}` : undefined"
-              @click="latest && navigateTo(`/runs/${latest.run.id}?page=${p.id}#page-${p.id}`)"
+              @click="
+                latest &&
+                navigateTo(
+                  `/runs/${latest.run.id}?page=${p.id}&device=${strategy}#page-${p.id}-${strategy}`
+                )
+              "
             >
               <td>
                 <NuxtLink
                   v-if="latest"
-                  :to="`/runs/${latest.run.id}?page=${p.id}#page-${p.id}`"
+                  :to="`/runs/${latest.run.id}?page=${p.id}&device=${strategy}#page-${p.id}-${strategy}`"
                   style="color: inherit"
                   @click.stop
                   ><strong>{{ p.label }}</strong></NuxtLink
