@@ -15,12 +15,24 @@ export interface AlertIssue {
   details?: IssueDetails | null
 }
 
+/** Context of a threshold alert: the page × device's other Lighthouse findings. */
+export interface AlertContext {
+  /** Issues flagged without an estimated gain for any metric (shown under the Performance alert). */
+  alsoFlagged: AlertIssue[]
+  /** Total number of issues Lighthouse reported for the page × device. */
+  total: number
+  /** Opens the page × device row (full list with details). */
+  open: () => void
+}
+
 const props = defineProps<{
   alerts: Alert[]
   /** Site the alerts belong to (for page labels). */
   siteId?: string | null
   /** Optional: Lighthouse issues that affect the alert's metric, shown under the message. */
   issuesFor?: (alert: Alert) => AlertIssue[]
+  /** Optional: the other Lighthouse findings of the alert's page × device and a way to open its row. */
+  contextFor?: (alert: Alert) => AlertContext | null
   /**
    * Browser checks of the alerts' run, so quality alerts can expand their detail in place.
    * When omitted (alerts of several runs), the run is fetched on first expand.
@@ -121,14 +133,17 @@ function checkFor(a: Alert) {
               {{ a.kind === 'quality' ? '–' : formatMetric(a.metric, a.limit) }}
             </td>
             <td style="white-space: normal">
-              <span
+              <button
                 v-if="a.kind === 'quality'"
+                type="button"
                 class="issue-toggle"
                 :class="{ open: openCheck === a.id }"
+                :aria-expanded="openCheck === a.id"
                 title="Show details"
                 @click="toggleCheck(a)"
-                >{{ a.message }}</span
               >
+                {{ a.message }}
+              </button>
               <template v-else>{{ a.message }}</template>
               <ul
                 v-if="issuesFor && issuesFor(a).length"
@@ -136,12 +151,15 @@ function checkFor(a: Alert) {
                 style="margin: 0.3rem 0 0; padding-left: 1.1rem"
               >
                 <li v-for="i in issuesFor(a)" :key="i.id">
-                  <span
+                  <button
+                    type="button"
                     class="issue-toggle"
                     :class="{ open: openIssue === `${a.id}:${i.id}` }"
+                    :aria-expanded="openIssue === `${a.id}:${i.id}`"
                     title="Show details"
                     @click="toggle(`${a.id}:${i.id}`)"
-                    >{{ i.title }}</span><template v-if="i.savings">
+                  >
+                    {{ i.title }}</button><template v-if="i.savings">
                     — ~{{
                       a.metric === 'cls' ? i.savings.toFixed(3) : Math.round(i.savings) + ' ms'
                     }}
@@ -153,6 +171,41 @@ function checkFor(a: Alert) {
                   />
                 </li>
               </ul>
+              <template v-if="contextFor && contextFor(a)">
+                <div
+                  v-if="contextFor(a)!.alsoFlagged.length"
+                  class="small muted"
+                  style="margin-top: 0.3rem"
+                >
+                  Also flagged (no estimated gain):
+                  <template v-for="(i, idx) in contextFor(a)!.alsoFlagged" :key="i.id"
+                    ><template v-if="idx">, </template
+                    ><button
+                      type="button"
+                      class="issue-toggle"
+                      :class="{ open: openIssue === `${a.id}:${i.id}` }"
+                      :aria-expanded="openIssue === `${a.id}:${i.id}`"
+                      title="Show details"
+                      @click="toggle(`${a.id}:${i.id}`)"
+                    >
+                      {{ i.title }}
+                    </button></template
+                  >
+                  <IssueDetail
+                    v-for="i in contextFor(a)!.alsoFlagged.filter(
+                      (x) => openIssue === `${a.id}:${x.id}`
+                    )"
+                    :key="i.id"
+                    :description="i.description"
+                    :details="i.details"
+                  />
+                </div>
+                <div v-if="contextFor(a)!.total" class="small" style="margin-top: 0.3rem">
+                  <a href="#" @click.prevent="contextFor(a)!.open()"
+                    >see all {{ contextFor(a)!.total }} issues of this page × device</a
+                  >
+                </div>
+              </template>
             </td>
           </tr>
           <tr v-if="a.kind === 'quality' && openCheck === a.id">

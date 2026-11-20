@@ -4,7 +4,8 @@ import type { CrawlResult } from '~~/server/utils/crawler'
 import type { FieldData, FieldMetric, Opportunity } from '~~/server/utils/psi'
 import { SCORE_METRICS, TIMING_METRICS, METRIC_LABELS, type Metric } from '~~/shared/types/sentinel'
 import { formatDate, formatDuration, formatMetric, formatTime } from '~~/shared/utils/format'
-import type { AlertIssue } from '~/components/AlertTable.vue'
+import { isMetricAudit } from '~~/shared/utils/lighthouse'
+import type { AlertContext, AlertIssue } from '~/components/AlertTable.vue'
 
 interface Details {
   samples: Record<string, number | null | string>[]
@@ -56,11 +57,14 @@ const issueBase = (o: Opportunity) => ({
   details: o.details ?? null,
 })
 const openOpportunity = ref<string | null>(null)
+/** Issues stored for a page × device (runs stored before the metric audits were excluded still have them). */
+const issuesOf = (r: { details: Details | null }) =>
+  (r.details?.opportunities ?? []).filter((o) => !isMetricAudit(o.id))
 
 /** Lighthouse issues whose metricSavings touch the alert's metric, biggest impact first. */
 function issuesFor(a: Alert): AlertIssue[] {
   const result = data.value?.results.find((r) => r.id === a.pageResultId)
-  const ops = result?.details?.opportunities ?? []
+  const ops = result ? issuesOf(result) : []
   const metric = a.metric as keyof Opportunity['metricSavings']
   if (a.metric === 'performance') {
     return ops
@@ -73,6 +77,36 @@ function issuesFor(a: Alert): AlertIssue[] {
     .map((o) => ({ ...issueBase(o), savings: o.metricSavings[metric] ?? null }))
     .sort((x, y) => (y.savings ?? 0) - (x.savings ?? 0))
     .slice(0, 5)
+}
+
+/** The other Lighthouse findings of the alert's page × device, and a way to open its row. */
+function contextFor(a: Alert): AlertContext | null {
+  // quality alerts carry no pageResultId: use the page × device result instead
+  const results = data.value?.results ?? []
+  const result =
+    a.pageResultId != null
+      ? results.find((r) => r.id === a.pageResultId)
+      : results.find((r) => r.pageId === a.pageId && r.strategy === a.strategy)
+  if (!result) return null
+  const ops = issuesOf(result)
+  const alsoFlagged =
+    a.metric === 'performance'
+      ? ops
+          .filter((o) => !o.savingsMs && !Object.values(o.metricSavings ?? {}).some((v) => v > 0))
+          .map((o) => ({ ...issueBase(o), savings: null }))
+      : []
+  return {
+    alsoFlagged,
+    total: ops.length,
+    open: () => {
+      expanded.value = result.id
+      nextTick(() =>
+        document
+          .getElementById(`page-${result.pageId}-${result.strategy}`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      )
+    },
+  }
 }
 
 async function remove() {
@@ -237,13 +271,13 @@ onUnmounted(() => clearInterval(timer))
                         Lighthouse {{ r.lighthouseVersion }}
                       </div>
                     </div>
-                    <div v-if="r.details.opportunities.length" style="flex: 1; min-width: 280px">
+                    <div v-if="issuesOf(r).length" style="flex: 1; min-width: 280px">
                       <h3>Top performance opportunities</h3>
                       <p class="muted small" style="margin: 0 0 0.4rem">
                         Click an issue for Lighthouse's explanation and per-URL breakdown.
                       </p>
                       <ul class="small" style="margin: 0; padding-left: 1.1rem">
-                        <li v-for="o in r.details.opportunities" :key="o.id">
+                        <li v-for="o in issuesOf(r)" :key="o.id">
                           <span
                             class="issue-toggle"
                             :class="{ open: openOpportunity === `${r.id}:${o.id}` }"
@@ -431,6 +465,7 @@ onUnmounted(() => clearInterval(timer))
           :checks="data.checks"
           :site-id="data.run.siteId"
           :issues-for="issuesFor"
+          :context-for="contextFor"
         />
         <p class="muted small" style="margin-top: 0.5rem">
           Threshold lines (warn / fail) are defined in <code>sentinel.config.ts</code> (per

@@ -1,3 +1,4 @@
+import { isMetricAudit } from '~~/shared/utils/lighthouse'
 import type { SentinelConfig, Strategy } from '~~/shared/types/sentinel'
 
 export type MetricSavings = Partial<Record<'lcp' | 'cls' | 'tbt' | 'fcp' | 'si' | 'inp', number>>
@@ -196,6 +197,7 @@ export function parsePsiResponse(data: Json): PsiSample {
     .filter(
       (a: Json) =>
         a &&
+        !isMetricAudit(a.id) &&
         typeof a.score === 'number' &&
         a.score < 0.9 &&
         a.scoreDisplayMode !== 'informative' &&
@@ -212,7 +214,6 @@ export function parsePsiResponse(data: Json): PsiSample {
       details: issueDetails(a),
     }))
     .sort((a: Json, b: Json) => (b.savingsMs ?? 0) - (a.savingsMs ?? 0))
-    .slice(0, 12)
 
   return {
     fetchTime: lhr.fetchTime ?? new Date().toISOString(),

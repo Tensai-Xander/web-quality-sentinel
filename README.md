@@ -7,7 +7,10 @@ of Google's lines. Every run asks
 timings (LCP, CLS, TBT, FCP, Speed Index, TTFB) of each configured page, on mobile and desktop.
 Results are stored in a local SQLite database and shown in a dashboard with history, trends,
 run-to-run comparison and alerts. Each alert lists the Lighthouse issues that affect its metric,
-and each issue opens Lighthouse's explanation and per-URL breakdown (the same table PSI shows).
+and each issue opens Lighthouse's explanation and per-URL breakdown (the same table PSI shows);
+the Performance alert also lists, as "Also flagged (no estimated gain)", the issues Lighthouse
+reports without a metric estimate (e.g. Forced reflow), and every alert links to the full issue
+list of its page × device.
 The same PSI answer also carries Google's real-user data (Chrome UX Report) for the exact URL, shown
 per page as "Real users" (LCP / INP / CLS / FCP / TTFB with Google's rating, or "No data").
 Every run also visits each page in a headless browser (Playwright), on a mobile and a desktop viewport, to catch what PSI does not
@@ -198,8 +201,8 @@ After the PSI samples of a page, the runner opens it in headless Chromium once p
 Each finding raises a _quality_ alert (`fail` for HTTP errors, broken links and critical/serious
 accessibility violations, `warn` otherwise). A page the browser could not load at all, or whose
 PSI samples all failed, raises a `fail` alert too ("Page could not be loaded…" / "Measurement
-failed…"), and a run in which no page could be measured ends `failed` instead of silently green. Click a quality alert's message — in the Overview,
-the Overview or the run page — to expand the matching detail in place (broken URLs and their
+failed…"), and a run in which no page could be measured ends `failed` instead of silently green. Click a quality alert's message — in the Overview
+or the run page — to expand the matching detail in place (broken URLs and their
 status, error messages, meta tag values, JSON-LD issues, failed axe rules with the affected
 elements); the run page's "Quality checks" table shows the full detail of every page and device. `pnpm install` downloads
 Playwright; the browser itself is fetched on first install with `pnpm exec playwright install chromium`
