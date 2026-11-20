@@ -430,10 +430,8 @@ onUnmounted(() => clearInterval(timer))
           :issues-for="issuesFor"
         />
         <p class="muted small" style="margin-top: 0.5rem">
-          Threshold lines (warn / fail) and regression rules are defined in
-          <code>sentinel.config.ts</code> (per site/page overrides in Settings). Regressions compare
-          with the median of the previous {{ config?.regression.baselineRuns }} completed runs (at
-          least 2 required).
+          Threshold lines (warn / fail) are defined in <code>sentinel.config.ts</code> (per
+          site/page overrides in Settings).
         </p>
       </section>
     </template>

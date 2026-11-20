@@ -75,11 +75,10 @@ export const alerts = sqliteTable(
     url: text('url').notNull(),
     strategy: text('strategy').notNull(),
     metric: text('metric').notNull(),
-    kind: text('kind').notNull(), // threshold | regression | quality
+    kind: text('kind').notNull(), // threshold | quality
     severity: text('severity').notNull(), // warn | fail
     actual: real('actual'),
     limit: real('limit'),
-    baseline: real('baseline'),
     message: text('message').notNull(),
     createdAt: text('created_at').notNull(),
   },

@@ -33,14 +33,6 @@ const config: SentinelConfig = {
     fcp: { warn: 1800, fail: 3000 },
   },
 
-  // Relative limits versus the baseline (median of the previous N runs of the same site).
-  regression: {
-    baselineRuns: 5,
-    scoreDrop: 10,
-    timingIncreasePct: 50,
-    minDelta: { lcp: 300, fcp: 300, tbt: 250, si: 500, ttfb: 200, cls: 0.03 },
-  },
-
   // Browser checks with Playwright, once per page and device per run (no quota, ~3-10 s each):
   // HTTP status, JavaScript console errors, broken same-site links, meta tags, JSON-LD and an
   // axe-core accessibility audit (WCAG 2.x A/AA + best practices).
