@@ -199,7 +199,7 @@ Each finding raises a _quality_ alert (`fail` for HTTP errors, broken links and 
 accessibility violations, `warn` otherwise). A page the browser could not load at all, or whose
 PSI samples all failed, raises a `fail` alert too ("Page could not be loaded…" / "Measurement
 failed…"), and a run in which no page could be measured ends `failed` instead of silently green. Click a quality alert's message — in the Overview,
-the run page or the Alerts page — to expand the matching detail in place (broken URLs and their
+the Overview or the run page — to expand the matching detail in place (broken URLs and their
 status, error messages, meta tag values, JSON-LD issues, failed axe rules with the affected
 elements); the run page's "Quality checks" table shows the full detail of every page and device. `pnpm install` downloads
 Playwright; the browser itself is fetched on first install with `pnpm exec playwright install chromium`
@@ -348,7 +348,7 @@ server/utils/findings.ts  threshold alerts (warn / fail lines)
 server/utils/runner.ts  run orchestration (one run at a time, progress, error handling)
 server/utils/crawler.ts Playwright visit: HTTP/JS errors, broken links, meta tags, JSON-LD, axe-core
 server/api/             JSON API used by the dashboard and by CI
-app/                    Nuxt dashboard: overview, run detail, trends, compare, alerts, settings
+app/                    Nuxt dashboard: overview, run detail, trends, compare, settings
 scripts/init-config.mjs add a site from its sitemap (CLI twin of Settings → Add a site)
 scripts/lib/sitemap.mjs sitemap discovery and page-template grouping (shared with the server)
 scripts/mock-psi.mjs    fake PSI endpoint for development

@@ -145,7 +145,6 @@ onUnmounted(() => clearInterval(timer))
             </div>
           </div>
           <div class="row">
-            <NuxtLink class="btn" :to="`/compare?to=${data.run.id}`">Compare…</NuxtLink>
             <button class="danger" :disabled="data.run.status === 'running'" @click="remove">
               Delete
             </button>
