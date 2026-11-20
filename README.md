@@ -42,7 +42,8 @@ The whole procedure for a new team or a new website takes about 10 minutes.
   samples = 48, plus retries), so the daily quota allows roughly 500 such runs; the per-100 s
   limit is never reached because requests are sequential and spaced by `psi.delayMs`. When the
   daily quota is exhausted the run stops with `PSI 429: Quota exceeded…` and the counter resets
-  at midnight Pacific time. A higher quota can be requested in the same console page.
+  at midnight Pacific time (a `429: Lighthouse is temporarily over capacity` is different: Google
+  is overloaded, the sample is retried and at worst that page × device fails). A higher quota can be requested in the same console page.
 
 ### 2. Install
 
@@ -228,8 +229,9 @@ users OK?", while the lab metrics answer "did the last release change something?
    is retried `psi.retries` times after `psi.retryDelayMs`, and so is a Lighthouse lab failure
    (`PSI 400: Lighthouse returned error: NO_FCP…` — Google's headless Chrome saw nothing painted
    in time; usually transient, so re-run that page, and investigate the page's rendering if it
-   keeps failing); quota (`429`) and key (`400`/`403`)
-   errors are never retried and stop the run. A page × device whose samples all failed is stored
+   keeps failing) and `PSI 429: Lighthouse is temporarily over capacity` (Google's backend is
+   overloaded, nothing to do with your quota — wait a few minutes). Quota (`429: Quota
+exceeded…`) and key (`400`/`403`) errors are never retried and stop the run. A page × device whose samples all failed is stored
    with the last error message and no metrics (+ a `fail` alert). A PSI answer without Lighthouse
    data (`runtimeError`, no performance score) counts as a failed sample, not as an empty result.
    Re-running a page inside a `failed` run keeps the run `failed` until
@@ -239,6 +241,27 @@ users OK?", while the lab metrics answer "did the last release change something?
 3. **History** – there are no relative "regression" rules: a change that stays inside a colour
    band raises nothing. Use the Trends chart (both lines drawn), the "compared with #N" deltas
    on the Overview and the Compare page to spot such drifts by eye.
+
+### What happens when something fails
+
+A _sample_ is one PSI request (page × device × attempt). A page × device is stored as `failed`
+(no metrics, a `fail` alert and a "re-run this page" link on the run page) only when **all** of
+its samples failed; otherwise the median of the successful samples is kept. "Run continues" means
+the other pages and devices are still measured.
+
+| Error (as shown on the run page)                                                  | Cause                                                                   | Retried?                                      | Effect                                                                                                     |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `fetch failed (ENOTFOUND …)`, `(ECONNRESET)`, `PSI request timed out after 120 s` | network between your machine and `www.googleapis.com` (DNS, VPN, proxy) | yes, `psi.retries` × after `psi.retryDelayMs` | sample fails; run continues                                                                                |
+| `PSI 500` … `PSI 503`                                                             | Google-side outage                                                      | yes                                           | sample fails; run continues                                                                                |
+| `PSI 400: Lighthouse returned error: NO_FCP…`                                     | Lighthouse saw nothing painted in time (often transient)                | yes                                           | sample fails; run continues — if it persists for one page, look at its rendering                           |
+| `PSI 429: Lighthouse is temporarily over capacity`                                | Google's Lighthouse backend is overloaded (not your quota)              | yes                                           | sample fails; run continues — wait a few minutes before re-running                                         |
+| `Lighthouse NO_FCP: …`, `PSI answered without any Lighthouse category`            | a 200 answer without usable Lighthouse data                             | yes                                           | sample fails; run continues                                                                                |
+| `PSI 429: Quota exceeded…`                                                        | daily quota of your API key exhausted (resets at midnight Pacific)      | no                                            | **run stops** as `failed`; pages not yet measured stay unmeasured — start a new run later                  |
+| `PSI 400: API key not valid…`, `PSI 403`                                          | missing / wrong / restricted `NUXT_PSI_API_KEY`                         | no                                            | **run stops** as `failed` — fix `.env`, restart, start a new run                                           |
+| `browser check timed out after … s`, other Playwright errors                      | the page never settled in Playwright, or Chromium is missing            | no                                            | stored on that page's browser-check row (HTTP alert when no status); PSI metrics unaffected; run continues |
+| `No page could be measured (site or network down?)`                               | every sample of every page failed                                       | –                                             | run `failed` (no green run for a dead site)                                                                |
+| `Interrupted by a server restart`                                                 | `pnpm dev` / the server was restarted during the run                    | –                                             | run `failed`; start a new run or re-run its failed rows                                                    |
+| anything else (unexpected exception)                                              | bug or environment problem                                              | –                                             | run `failed` with the message; please report it                                                            |
 
 ### Alert severity (`warn` / `fail`)
 

@@ -111,6 +111,13 @@ describe('fetchPsi error classification', () => {
     expect(err.status).toBeUndefined()
     expect(err.message).toMatch(/NO_FCP/)
   })
+  it('a 429 "over capacity" is a lab failure too (no status), unlike a quota 429', async () => {
+    answer(429, 'Lighthouse is temporarily over capacity; please retry later.')
+    const err = await call()
+    expect(err).toBeInstanceOf(PsiError)
+    expect(err.status).toBeUndefined()
+    expect(err.message).toMatch(/over capacity/)
+  })
   it('key and quota errors keep their status', async () => {
     answer(400, 'API key not valid. Please pass a valid API key.')
     expect((await call()).status).toBe(400)
