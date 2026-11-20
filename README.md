@@ -237,7 +237,7 @@ users OK?", while the lab metrics answer "did the last release change something?
 2. **Thresholds** – each stored value is compared with the two absolute lines of its metric
    (`thresholds`, or the site/page override). Crossing a line raises a _threshold_ alert.
 3. **History** – there are no relative "regression" rules: a change that stays inside a colour
-   band raises nothing. Use the Trends chart (both lines drawn), the deltas on the run page and
+   band raises nothing. Use the Trends chart (both lines drawn), the "compared with #N" deltas on the Overview and
    the Compare page to spot such drifts by eye.
 
 ### Alert severity (`warn` / `fail`)
