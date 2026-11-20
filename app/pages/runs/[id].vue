@@ -257,70 +257,72 @@ onUnmounted(() => clearInterval(timer))
                 </td>
                 <td class="num">{{ r.samples }}</td>
               </tr>
-              <tr v-if="expanded === r.id && r.details">
+              <tr v-if="expanded === r.id">
                 <td :colspan="metrics.length + 3" style="white-space: normal; background: #fafbfc">
-                  <div class="row" style="align-items: flex-start; gap: 2rem">
-                    <div>
-                      <h3>Samples (median is stored)</h3>
-                      <table class="small">
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>Analysed at</th>
-                            <th v-for="m in metrics" :key="m" class="num">
-                              {{ METRIC_LABELS[m] }}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr v-for="(s, i) in r.details.samples" :key="i">
-                            <td>{{ i + 1 }}</td>
-                            <td class="muted">{{ formatTime(s.fetchTime as string) }}</td>
-                            <td v-for="m in metrics" :key="m" class="num">
-                              {{ formatMetric(m, s[m] as number | null) }}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                      <div class="muted small" style="margin-top: 0.4rem">
-                        Lighthouse {{ r.lighthouseVersion }}
+                  <template v-if="r.details">
+                    <div class="row" style="align-items: flex-start; gap: 2rem">
+                      <div>
+                        <h3>Samples (median is stored)</h3>
+                        <table class="small">
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th>Analysed at</th>
+                              <th v-for="m in metrics" :key="m" class="num">
+                                {{ METRIC_LABELS[m] }}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="(s, i) in r.details.samples" :key="i">
+                              <td>{{ i + 1 }}</td>
+                              <td class="muted">{{ formatTime(s.fetchTime as string) }}</td>
+                              <td v-for="m in metrics" :key="m" class="num">
+                                {{ formatMetric(m, s[m] as number | null) }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <div class="muted small" style="margin-top: 0.4rem">
+                          Lighthouse {{ r.lighthouseVersion }}
+                        </div>
+                      </div>
+                      <div v-if="issuesOf(r).length" style="flex: 1; min-width: 280px">
+                        <h3>Top performance opportunities</h3>
+                        <p class="muted small" style="margin: 0 0 0.4rem">
+                          Click an issue for Lighthouse's explanation and per-URL breakdown.
+                        </p>
+                        <ul class="small" style="margin: 0; padding-left: 1.1rem">
+                          <li v-for="o in issuesOf(r)" :key="o.id">
+                            <span
+                              class="issue-toggle"
+                              :class="{ open: openOpportunity === `${r.id}:${o.id}` }"
+                              title="Show details"
+                              @click="
+                                openOpportunity =
+                                  openOpportunity === `${r.id}:${o.id}` ? null : `${r.id}:${o.id}`
+                              "
+                              >{{ o.title }}</span
+                            >
+                            <span class="muted">
+                              <template v-if="o.displayValue"> — {{ o.displayValue }}</template>
+                              <template v-else-if="o.savingsMs">
+                                — ~{{ Math.round(o.savingsMs) }} ms</template
+                              >
+                            </span>
+                          </li>
+                        </ul>
                       </div>
                     </div>
-                    <div v-if="issuesOf(r).length" style="flex: 1; min-width: 280px">
-                      <h3>Top performance opportunities</h3>
-                      <p class="muted small" style="margin: 0 0 0.4rem">
-                        Click an issue for Lighthouse's explanation and per-URL breakdown.
-                      </p>
-                      <ul class="small" style="margin: 0; padding-left: 1.1rem">
-                        <li v-for="o in issuesOf(r)" :key="o.id">
-                          <span
-                            class="issue-toggle"
-                            :class="{ open: openOpportunity === `${r.id}:${o.id}` }"
-                            title="Show details"
-                            @click="
-                              openOpportunity =
-                                openOpportunity === `${r.id}:${o.id}` ? null : `${r.id}:${o.id}`
-                            "
-                            >{{ o.title }}</span
-                          >
-                          <span class="muted">
-                            <template v-if="o.displayValue"> — {{ o.displayValue }}</template>
-                            <template v-else-if="o.savingsMs">
-                              — ~{{ Math.round(o.savingsMs) }} ms</template
-                            >
-                          </span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                  <template v-for="o in r.details.opportunities" :key="o.id">
-                    <IssueDetail
-                      v-if="openOpportunity === `${r.id}:${o.id}`"
-                      :description="o.description"
-                      :details="o.details"
-                    />
+                    <template v-for="o in r.details.opportunities" :key="o.id">
+                      <IssueDetail
+                        v-if="openOpportunity === `${r.id}:${o.id}`"
+                        :description="o.description"
+                        :details="o.details"
+                      />
+                    </template>
                   </template>
-                  <h3 style="margin-top: 1rem">
+                  <h3 :style="{ marginTop: r.details ? '1rem' : '0' }">
                     Alerts for {{ pageLabel(r.pageId, data.run.siteId) }} · {{ r.strategy }} ({{
                       alertsOf(r).length
                     }})
