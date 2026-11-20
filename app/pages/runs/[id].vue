@@ -106,14 +106,14 @@ async function rerunPage(pageId: string) {
 }
 
 let timer: ReturnType<typeof setInterval> | undefined
-// Link from the Overview: `?page=<pageId>&device=<strategy>` opens that row (the first row of the
-// page when no device is given); the `#page-<pageId>-<strategy>` hash lets the router scroll to it.
+// Link from the Overview: `?page=<pageId>&device=<strategy>` opens that row, falling back to the
+// page's first row when that device was not measured (or no device is given); the
+// `#page-<pageId>-<strategy>` / `#page-<pageId>` hash lets the router scroll to it.
 function openPageFromQuery() {
   const { page: pageId, device } = route.query
   if (typeof pageId !== 'string' || expanded.value !== null) return
-  const r = sorted.value.find(
-    (x) => x.pageId === pageId && (typeof device !== 'string' || x.strategy === device)
-  )
+  const rows = sorted.value.filter((x) => x.pageId === pageId)
+  const r = rows.find((x) => x.strategy === device) ?? rows[0]
   if (r) expanded.value = r.id
 }
 watch(sorted, openPageFromQuery, { immediate: true })
@@ -169,6 +169,10 @@ onUnmounted(() => clearInterval(timer))
                 @click="expanded = expanded === r.id ? null : r.id"
               >
                 <td>
+                  <a
+                    v-if="sorted.find((x) => x.pageId === r.pageId) === r"
+                    :id="`page-${r.pageId}`"
+                  />
                   <strong>{{ pageLabel(r.pageId, data.run.siteId) }}</strong>
                   <span
                     v-if="r.noindex"
