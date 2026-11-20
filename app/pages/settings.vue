@@ -402,7 +402,7 @@ function alreadyHas(site: ClientSite, path: string) {
                   : 'warn above the first value, fail above the second'
               "
             >
-              {{ METRIC_LABELS[m] }} {{ isScoreMetric(m) ? '≥' : '≤' }}
+              {{ METRIC_LABELS[m] }} {{ isScoreMetric(m) ? '<' : '>' }}
               <div class="muted small" style="font-weight: normal">warn / fail</div>
             </th>
             <th />
