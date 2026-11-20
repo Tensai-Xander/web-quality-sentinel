@@ -67,6 +67,51 @@ describe('parsePsiResponse', () => {
   })
 })
 
+describe('opportunities', () => {
+  it('lists failing performance audits but not the metric audits themselves', () => {
+    const s = parsePsiResponse(
+      lhr({
+        categories: {
+          performance: {
+            score: 0.5,
+            auditRefs: [
+              { id: 'total-blocking-time' },
+              { id: 'unused-javascript' },
+              { id: 'forced-reflow-insight' },
+              { id: 'uses-long-cache-ttl' },
+            ],
+          },
+        },
+        audits: {
+          'total-blocking-time': {
+            id: 'total-blocking-time',
+            score: 0.3,
+            scoreDisplayMode: 'numeric',
+            title: 'TBT',
+          },
+          'unused-javascript': {
+            id: 'unused-javascript',
+            score: 0.4,
+            title: 'Reduce unused JavaScript',
+            details: { overallSavingsMs: 600 },
+            metricSavings: { LCP: 600, FCP: 0 },
+          },
+          'forced-reflow-insight': {
+            id: 'forced-reflow-insight',
+            score: 0,
+            title: 'Forced reflow',
+            metricSavings: {},
+          },
+          'uses-long-cache-ttl': { id: 'uses-long-cache-ttl', score: 1, title: 'cache' },
+        },
+      })
+    )
+    expect(s.opportunities.map((o) => o.id)).toEqual(['unused-javascript', 'forced-reflow-insight'])
+    expect(s.opportunities[0]!.metricSavings).toEqual({ lcp: 600, fcp: 0 })
+    expect(s.opportunities[1]!.savingsMs).toBeNull()
+  })
+})
+
 describe('median / aggregateSamples', () => {
   it('median ignores nulls, averages the middle pair', () => {
     expect(median([3, null, 1, 2])).toBe(2)
