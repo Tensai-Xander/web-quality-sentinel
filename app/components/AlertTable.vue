@@ -156,7 +156,7 @@ function checkFor(a: Alert) {
             </td>
           </tr>
           <tr v-if="a.kind === 'quality' && openCheck === a.id">
-            <td colspan="9" style="white-space: normal; padding: 0.4rem 0.6rem">
+            <td colspan="8" style="white-space: normal; padding: 0.4rem 0.6rem">
               <div class="issue-detail" style="margin: 0">
                 <template v-if="checkFor(a) === undefined">
                   <span class="muted small">{{
