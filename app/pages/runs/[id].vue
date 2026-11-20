@@ -79,6 +79,21 @@ function issuesFor(a: Alert): AlertIssue[] {
     .slice(0, 5)
 }
 
+/** Alerts of a page × device (threshold alerts of its result + quality alerts of its page). */
+const alertsOf = (r: { pageId: string; strategy: string }) =>
+  (data.value?.alerts ?? []).filter((a) => a.pageId === r.pageId && a.strategy === r.strategy)
+/** Pages of this run, for the Alerts section filter. */
+const alertPages = computed(() =>
+  [...new Set((data.value?.alerts ?? []).map((a) => a.pageId))].map((id) => ({
+    id,
+    label: pageLabel(id, data.value?.run.siteId ?? null),
+  }))
+)
+const linkedPage = computed(() => (typeof route.query.page === 'string' ? route.query.page : null))
+const linkedDevice = computed(() =>
+  typeof route.query.device === 'string' ? route.query.device : null
+)
+
 /** The other Lighthouse findings of the alert's page × device, and a way to open its row. */
 function contextFor(a: Alert): AlertContext | null {
   const result = data.value?.results.find((r) => r.id === a.pageResultId)
@@ -300,6 +315,17 @@ onUnmounted(() => clearInterval(timer))
                       :details="o.details"
                     />
                   </template>
+                  <h3 style="margin-top: 1rem">
+                    Alerts for {{ pageLabel(r.pageId, data.run.siteId) }} · {{ r.strategy }} ({{
+                      alertsOf(r).length
+                    }})
+                  </h3>
+                  <AlertTable
+                    :alerts="alertsOf(r)"
+                    :checks="data.checks"
+                    :site-id="data.run.siteId"
+                    :issues-for="issuesFor"
+                  />
                 </td>
               </tr>
             </template>
@@ -461,6 +487,9 @@ onUnmounted(() => clearInterval(timer))
           :site-id="data.run.siteId"
           :issues-for="issuesFor"
           :context-for="contextFor"
+          :pages="alertPages"
+          :page="linkedPage"
+          :device="linkedDevice"
         />
         <p class="muted small" style="margin-top: 0.5rem">
           Threshold lines (warn / fail) are defined in <code>sentinel.config.ts</code> (per

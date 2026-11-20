@@ -33,6 +33,10 @@ const props = defineProps<{
   issuesFor?: (alert: Alert) => AlertIssue[]
   /** Optional: the other Lighthouse findings of the alert's page × device and a way to open its row. */
   contextFor?: (alert: Alert) => AlertContext | null
+  /** Page / device filters (shown when `pages` is given); `page` + `device` preset them. */
+  pages?: { id: string; label: string }[]
+  page?: string | null
+  device?: string | null
   /**
    * Browser checks of the alerts' run, so quality alerts can expand their detail in place.
    * When omitted (alerts of several runs), the run is fetched on first expand.
@@ -42,13 +46,30 @@ const props = defineProps<{
 const { pageLabel } = useSentinel()
 const kind = ref<'all' | 'threshold' | 'quality'>('all')
 const severity = ref<'all' | 'warn' | 'fail'>('all')
+const page = ref(props.page ?? 'all')
+const device = ref(props.device ?? 'all')
+watch(
+  () => [props.page, props.device],
+  ([p, d]) => {
+    page.value = p ?? 'all'
+    device.value = d ?? 'all'
+  }
+)
+const devices = computed(() => [...new Set(props.alerts.map((a) => a.strategy))].sort())
 const filtered = computed(() =>
   props.alerts.filter(
     (a) =>
       (kind.value === 'all' || a.kind === kind.value) &&
-      (severity.value === 'all' || a.severity === severity.value)
+      (severity.value === 'all' || a.severity === severity.value) &&
+      (page.value === 'all' || a.pageId === page.value) &&
+      (device.value === 'all' || a.strategy === device.value)
   )
 )
+const narrowed = computed(() => page.value !== 'all' || device.value !== 'all')
+function showAll() {
+  page.value = 'all'
+  device.value = 'all'
+}
 const openIssue = ref<string | null>(null)
 const toggle = (key: string) => (openIssue.value = openIssue.value === key ? null : key)
 
@@ -94,7 +115,18 @@ function checkFor(a: Alert) {
         <option value="fail">Fail</option>
         <option value="warn">Warn</option>
       </select>
+      <template v-if="pages">
+        <select v-model="page" aria-label="Page">
+          <option value="all">All pages</option>
+          <option v-for="p in pages" :key="p.id" :value="p.id">{{ p.label }}</option>
+        </select>
+        <select v-model="device" aria-label="Device">
+          <option value="all">All devices</option>
+          <option v-for="d in devices" :key="d" :value="d">{{ d }}</option>
+        </select>
+      </template>
       <span class="muted small">{{ filtered.length }} / {{ alerts.length }}</span>
+      <a v-if="narrowed" href="#" class="small" @click.prevent="showAll">show all</a>
     </div>
     <div v-if="!filtered.length" class="empty">No alerts match the filters.</div>
     <table v-else>
