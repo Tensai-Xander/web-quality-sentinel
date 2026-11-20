@@ -171,14 +171,17 @@ function checkFor(a: Alert) {
               {{ a.kind === 'quality' ? '–' : formatMetric(a.metric, a.limit) }}
             </td>
             <td style="white-space: normal">
-              <span
+              <button
                 v-if="a.kind === 'quality'"
+                type="button"
                 class="issue-toggle"
                 :class="{ open: openCheck === a.id }"
+                :aria-expanded="openCheck === a.id"
                 title="Show details"
                 @click="toggleCheck(a)"
-                >{{ a.message }}</span
               >
+                {{ a.message }}
+              </button>
               <template v-else>{{ a.message }}</template>
               <ul
                 v-if="issuesFor && issuesFor(a).length"
@@ -186,12 +189,15 @@ function checkFor(a: Alert) {
                 style="margin: 0.3rem 0 0; padding-left: 1.1rem"
               >
                 <li v-for="i in issuesFor(a)" :key="i.id">
-                  <span
+                  <button
+                    type="button"
                     class="issue-toggle"
                     :class="{ open: openIssue === `${a.id}:${i.id}` }"
+                    :aria-expanded="openIssue === `${a.id}:${i.id}`"
                     title="Show details"
                     @click="toggle(`${a.id}:${i.id}`)"
-                    >{{ i.title }}</span><template v-if="i.savings">
+                  >
+                    {{ i.title }}</button><template v-if="i.savings">
                     — ~{{
                       a.metric === 'cls' ? i.savings.toFixed(3) : Math.round(i.savings) + ' ms'
                     }}
@@ -212,13 +218,16 @@ function checkFor(a: Alert) {
                   Also flagged (no estimated gain):
                   <template v-for="(i, idx) in contextFor(a)!.alsoFlagged" :key="i.id"
                     ><template v-if="idx">, </template
-                    ><span
+                    ><button
+                      type="button"
                       class="issue-toggle"
                       :class="{ open: openIssue === `${a.id}:${i.id}` }"
+                      :aria-expanded="openIssue === `${a.id}:${i.id}`"
                       title="Show details"
                       @click="toggle(`${a.id}:${i.id}`)"
-                      >{{ i.title }}</span
-                    ></template
+                    >
+                      {{ i.title }}
+                    </button></template
                   >
                   <IssueDetail
                     v-for="i in contextFor(a)!.alsoFlagged.filter(

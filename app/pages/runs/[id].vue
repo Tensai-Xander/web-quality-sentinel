@@ -96,7 +96,12 @@ const linkedDevice = computed(() =>
 
 /** The other Lighthouse findings of the alert's page × device, and a way to open its row. */
 function contextFor(a: Alert): AlertContext | null {
-  const result = data.value?.results.find((r) => r.id === a.pageResultId)
+  // quality alerts carry no pageResultId: use the page × device result instead
+  const results = data.value?.results ?? []
+  const result =
+    a.pageResultId != null
+      ? results.find((r) => r.id === a.pageResultId)
+      : results.find((r) => r.pageId === a.pageId && r.strategy === a.strategy)
   if (!result) return null
   const ops = issuesOf(result)
   const alsoFlagged =

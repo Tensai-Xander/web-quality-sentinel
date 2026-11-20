@@ -214,7 +214,6 @@ export function parsePsiResponse(data: Json): PsiSample {
       details: issueDetails(a),
     }))
     .sort((a: Json, b: Json) => (b.savingsMs ?? 0) - (a.savingsMs ?? 0))
-    .slice(0, 12)
 
   return {
     fetchTime: lhr.fetchTime ?? new Date().toISOString(),
