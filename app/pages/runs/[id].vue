@@ -79,6 +79,21 @@ function issuesFor(a: Alert): AlertIssue[] {
     .slice(0, 5)
 }
 
+/** Alerts of a page × device (threshold alerts of its result + quality alerts of its page). */
+const alertsOf = (r: { pageId: string; strategy: string }) =>
+  (data.value?.alerts ?? []).filter((a) => a.pageId === r.pageId && a.strategy === r.strategy)
+/** Pages of this run, for the Alerts section filter. */
+const alertPages = computed(() =>
+  [...new Set((data.value?.alerts ?? []).map((a) => a.pageId))].map((id) => ({
+    id,
+    label: pageLabel(id, data.value?.run.siteId ?? null),
+  }))
+)
+const linkedPage = computed(() => (typeof route.query.page === 'string' ? route.query.page : null))
+const linkedDevice = computed(() =>
+  typeof route.query.device === 'string' ? route.query.device : null
+)
+
 /** The other Lighthouse findings of the alert's page × device, and a way to open its row. */
 function contextFor(a: Alert): AlertContext | null {
   // quality alerts carry no pageResultId: use the page × device result instead
@@ -242,69 +257,83 @@ onUnmounted(() => clearInterval(timer))
                 </td>
                 <td class="num">{{ r.samples }}</td>
               </tr>
-              <tr v-if="expanded === r.id && r.details">
+              <tr v-if="expanded === r.id">
                 <td :colspan="metrics.length + 3" style="white-space: normal; background: #fafbfc">
-                  <div class="row" style="align-items: flex-start; gap: 2rem">
-                    <div>
-                      <h3>Samples (median is stored)</h3>
-                      <table class="small">
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>Analysed at</th>
-                            <th v-for="m in metrics" :key="m" class="num">
-                              {{ METRIC_LABELS[m] }}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr v-for="(s, i) in r.details.samples" :key="i">
-                            <td>{{ i + 1 }}</td>
-                            <td class="muted">{{ formatTime(s.fetchTime as string) }}</td>
-                            <td v-for="m in metrics" :key="m" class="num">
-                              {{ formatMetric(m, s[m] as number | null) }}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                      <div class="muted small" style="margin-top: 0.4rem">
-                        Lighthouse {{ r.lighthouseVersion }}
+                  <template v-if="r.details">
+                    <div class="row" style="align-items: flex-start; gap: 2rem">
+                      <div>
+                        <h3>Samples (median is stored)</h3>
+                        <table class="small">
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th>Analysed at</th>
+                              <th v-for="m in metrics" :key="m" class="num">
+                                {{ METRIC_LABELS[m] }}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="(s, i) in r.details.samples" :key="i">
+                              <td>{{ i + 1 }}</td>
+                              <td class="muted">{{ formatTime(s.fetchTime as string) }}</td>
+                              <td v-for="m in metrics" :key="m" class="num">
+                                {{ formatMetric(m, s[m] as number | null) }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <div class="muted small" style="margin-top: 0.4rem">
+                          Lighthouse {{ r.lighthouseVersion }}
+                        </div>
+                      </div>
+                      <div v-if="issuesOf(r).length" style="flex: 1; min-width: 280px">
+                        <h3>Top performance opportunities</h3>
+                        <p class="muted small" style="margin: 0 0 0.4rem">
+                          Click an issue for Lighthouse's explanation and per-URL breakdown.
+                        </p>
+                        <ul class="small" style="margin: 0; padding-left: 1.1rem">
+                          <li v-for="o in issuesOf(r)" :key="o.id">
+                            <span
+                              class="issue-toggle"
+                              :class="{ open: openOpportunity === `${r.id}:${o.id}` }"
+                              title="Show details"
+                              @click="
+                                openOpportunity =
+                                  openOpportunity === `${r.id}:${o.id}` ? null : `${r.id}:${o.id}`
+                              "
+                              >{{ o.title }}</span
+                            >
+                            <span class="muted">
+                              <template v-if="o.displayValue"> — {{ o.displayValue }}</template>
+                              <template v-else-if="o.savingsMs">
+                                — ~{{ Math.round(o.savingsMs) }} ms</template
+                              >
+                            </span>
+                          </li>
+                        </ul>
                       </div>
                     </div>
-                    <div v-if="issuesOf(r).length" style="flex: 1; min-width: 280px">
-                      <h3>Top performance opportunities</h3>
-                      <p class="muted small" style="margin: 0 0 0.4rem">
-                        Click an issue for Lighthouse's explanation and per-URL breakdown.
-                      </p>
-                      <ul class="small" style="margin: 0; padding-left: 1.1rem">
-                        <li v-for="o in issuesOf(r)" :key="o.id">
-                          <span
-                            class="issue-toggle"
-                            :class="{ open: openOpportunity === `${r.id}:${o.id}` }"
-                            title="Show details"
-                            @click="
-                              openOpportunity =
-                                openOpportunity === `${r.id}:${o.id}` ? null : `${r.id}:${o.id}`
-                            "
-                            >{{ o.title }}</span
-                          >
-                          <span class="muted">
-                            <template v-if="o.displayValue"> — {{ o.displayValue }}</template>
-                            <template v-else-if="o.savingsMs">
-                              — ~{{ Math.round(o.savingsMs) }} ms</template
-                            >
-                          </span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                  <template v-for="o in r.details.opportunities" :key="o.id">
-                    <IssueDetail
-                      v-if="openOpportunity === `${r.id}:${o.id}`"
-                      :description="o.description"
-                      :details="o.details"
-                    />
+                    <template v-for="o in r.details.opportunities" :key="o.id">
+                      <IssueDetail
+                        v-if="openOpportunity === `${r.id}:${o.id}`"
+                        :description="o.description"
+                        :details="o.details"
+                      />
+                    </template>
                   </template>
+                  <h3 :style="{ marginTop: r.details ? '1rem' : '0' }">
+                    Alerts for {{ pageLabel(r.pageId, data.run.siteId) }} · {{ r.strategy }} ({{
+                      alertsOf(r).length
+                    }})
+                  </h3>
+                  <AlertTable
+                    :alerts="alertsOf(r)"
+                    :checks="data.checks"
+                    :site-id="data.run.siteId"
+                    :issues-for="issuesFor"
+                    hide-page-device
+                  />
                 </td>
               </tr>
             </template>
@@ -466,6 +495,9 @@ onUnmounted(() => clearInterval(timer))
           :site-id="data.run.siteId"
           :issues-for="issuesFor"
           :context-for="contextFor"
+          :pages="alertPages"
+          :page="linkedPage"
+          :device="linkedDevice"
         />
         <p class="muted small" style="margin-top: 0.5rem">
           Threshold lines (warn / fail) are defined in <code>sentinel.config.ts</code> (per
