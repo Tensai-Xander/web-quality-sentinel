@@ -42,7 +42,8 @@ The whole procedure for a new team or a new website takes about 10 minutes.
   samples = 48, plus retries), so the daily quota allows roughly 500 such runs; the per-100 s
   limit is never reached because requests are sequential and spaced by `psi.delayMs`. When the
   daily quota is exhausted the run stops with `PSI 429: Quota exceeded…` and the counter resets
-  at midnight Pacific time. A higher quota can be requested in the same console page.
+  at midnight Pacific time (a `429: Lighthouse is temporarily over capacity` is different: Google
+  is overloaded, the sample is retried and at worst that page × device fails). A higher quota can be requested in the same console page.
 
 ### 2. Install
 
@@ -228,8 +229,9 @@ users OK?", while the lab metrics answer "did the last release change something?
    is retried `psi.retries` times after `psi.retryDelayMs`, and so is a Lighthouse lab failure
    (`PSI 400: Lighthouse returned error: NO_FCP…` — Google's headless Chrome saw nothing painted
    in time; usually transient, so re-run that page, and investigate the page's rendering if it
-   keeps failing); quota (`429`) and key (`400`/`403`)
-   errors are never retried and stop the run. A page × device whose samples all failed is stored
+   keeps failing) and `PSI 429: Lighthouse is temporarily over capacity` (Google's backend is
+   overloaded, nothing to do with your quota — wait a few minutes). Quota (`429: Quota
+exceeded…`) and key (`400`/`403`) errors are never retried and stop the run. A page × device whose samples all failed is stored
    with the last error message and no metrics (+ a `fail` alert). A PSI answer without Lighthouse
    data (`runtimeError`, no performance score) counts as a failed sample, not as an empty result.
    Re-running a page inside a `failed` run keeps the run `failed` until

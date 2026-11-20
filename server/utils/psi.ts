@@ -294,13 +294,16 @@ export async function fetchPsi(
     } catch {
       /* ignore */
     }
-    // "Lighthouse returned error: NO_FCP…" is a failure of that lab run (often transient; if it
-    // persists the page's rendering needs a look), not a key/quota problem: no status, so it is
-    // retried and never fatal for the run.
-    const lighthouse = res.status === 400 && /Lighthouse returned error/i.test(detail)
+    // Failures of that lab run, not key/quota problems: "Lighthouse returned error: NO_FCP…"
+    // (often transient; if it persists the page's rendering needs a look) and "Lighthouse is
+    // temporarily over capacity" (Google's backend is overloaded, a 429 unrelated to the quota).
+    // No status, so they are retried and never fatal for the run.
+    const labFailure =
+      (res.status === 400 && /Lighthouse returned error/i.test(detail)) ||
+      (res.status === 429 && /over capacity/i.test(detail))
     throw new PsiError(
       `PSI ${res.status}${detail ? `: ${detail}` : ''}`,
-      lighthouse ? undefined : res.status
+      labFailure ? undefined : res.status
     )
   }
   return parsePsiResponse(await res.json())
