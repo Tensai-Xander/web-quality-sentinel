@@ -19,7 +19,6 @@ interface SitemapResult {
   origin: string
   urlCount: number
   pages: Proposal[]
-  estimatedMinutes: number
   warnings: string[]
 }
 
@@ -268,8 +267,7 @@ function alreadyHas(site: ClientSite, path: string) {
             </h2>
             <div class="muted small">
               <a :href="s.baseUrl" target="_blank" rel="noopener">{{ s.baseUrl }}</a>
-              · {{ s.pages.length }} pages · a full run ≈
-              {{ Math.round((s.pages.length * 6 * 12) / 60) }} min
+              · {{ s.pages.length }} pages
             </div>
           </template>
           <div v-else class="row">
